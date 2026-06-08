@@ -231,3 +231,79 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         )
     out_path.write_text("\n".join(lines), encoding="utf-8")
     return out_path
+
+
+# Countdown name-card label (bottom centre) + accent rank badge above it + top title.
+CD_NAME = {
+    "fontname": "Arial", "fontsize": 104, "primary": "&H00FFFFFF",
+    "outline_col": "&H00000000", "back": "&HB4000000", "bold": -1,
+    "borderstyle": 1, "outline": 6, "shadow": 3, "alignment": 2, "marginv": 300,
+}
+CD_RANK = {
+    "fontname": "Arial", "fontsize": 120, "primary": "&H0000E6FF",  # warm gold
+    "outline_col": "&H00000000", "back": "&H00000000", "bold": -1,
+    "borderstyle": 1, "outline": 6, "shadow": 2, "alignment": 2, "marginv": 430,
+}
+CD_TITLE = {
+    "fontname": "Arial", "fontsize": 78, "primary": "&H00FFFFFF",
+    "outline_col": "&H00000000", "back": "&HA0000000", "bold": -1,
+    "borderstyle": 3, "outline": 5, "shadow": 0, "alignment": 8, "marginv": 150,
+}
+
+
+def build_countdown_ass(
+    out_path: Path,
+    *,
+    words: list[Word],
+    segments: list[dict],
+    title: str = "",
+    play_w: int = 1080,
+    play_h: int = 1920,
+) -> Path:
+    """One ASS for a countdown edit: glowing centred word captions across the whole
+    thing, plus a per-item name-card (label) and a gold #rank badge timed to each
+    item's window, plus the title pinned during the intro. `segments` is a list of
+    {start, end, kind, tag, rank} (kind 'intro' or 'item')."""
+    def mv(p):  # scale a preset margin to this height
+        return round(p["marginv"] * play_h / REF_H)
+    style_lines = [
+        _style_line(STYLES["glow"], mv(STYLES["glow"]), name="Pop"),
+        _style_line(CD_NAME, mv(CD_NAME), name="CName"),
+        _style_line(CD_RANK, mv(CD_RANK), name="CRank"),
+        _style_line(CD_TITLE, mv(CD_TITLE), name="CTitle"),
+    ]
+    header = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {play_w}
+PlayResY: {play_h}
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+{chr(10).join(style_lines)}
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    lines = [header]
+    # Glowing centred word captions across the whole narration.
+    for start, end, text in _chunk_words(words):
+        if end <= start:
+            continue
+        lines.append(
+            f"Dialogue: 0,{_fmt_time(start)},{_fmt_time(end)},Pop,,0,0,0,,"
+            + r"{\blur5}" + _escape(text).upper()
+        )
+    # Per-segment overlays.
+    for seg in segments:
+        s, e = _fmt_time(seg["start"]), _fmt_time(seg["end"])
+        if seg.get("kind") == "intro" and title.strip():
+            lines.append(f"Dialogue: 0,{s},{e},CTitle,,40,40,0,,{_escape(title).upper()}")
+        if seg.get("kind") == "item":
+            if seg.get("tag"):
+                lines.append(f"Dialogue: 0,{s},{e},CName,,40,40,0,,{_escape(str(seg['tag'])).upper()}")
+            if seg.get("rank") is not None:
+                lines.append(f"Dialogue: 0,{s},{e},CRank,,40,40,0,,#{int(seg['rank'])}")
+    out_path.write_text("\n".join(lines), encoding="utf-8")
+    return out_path

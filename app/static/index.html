@@ -24,9 +24,10 @@
     </header>
 
     <!-- Mode tabs -->
-    <div class="flex gap-2 mb-5">
+    <div class="flex gap-2 mb-5 flex-wrap">
       <button data-mode="highlights" class="modebtn tabsel px-4 py-2 rounded-xl font-semibold text-sm">🎬 Highlights edit</button>
       <button data-mode="news" class="modebtn bg-slate-800 px-4 py-2 rounded-xl font-semibold text-sm">📰 News edit</button>
+      <button data-mode="countdown" class="modebtn bg-slate-800 px-4 py-2 rounded-xl font-semibold text-sm">🏆 Countdown</button>
       <button data-mode="imageedit" class="modebtn bg-slate-800 px-4 py-2 rounded-xl font-semibold text-sm">🖼️ Photo edit</button>
     </div>
 
@@ -89,6 +90,17 @@
               <select name="voice" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10"><option value="">Auto</option></select>
             </label>
           </div>
+        </div>
+
+        <!-- countdown -->
+        <div data-for="countdown" class="space-y-3 hidden">
+          <p class="text-sm text-slate-300">Makaloozas-style ranked countdown: an AI voiceover ranks the top N (web-searched) with name-cards, gold rank badges & glowing captions over your player photos.</p>
+          <input name="topic_cd" type="text" placeholder="Top 5 national teams to win the 2026 World Cup" class="w-full bg-slate-900/70 rounded-lg px-3 py-2 text-sm border border-white/10" />
+          <label class="text-xs text-slate-400 block">How many (top N)
+            <input name="count_cd" type="number" min="3" max="10" value="5" class="mt-1 w-32 bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
+          </label>
+          <input name="images_cd" type="file" accept="image/*" multiple class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-600 file:text-white" />
+          <p class="text-[11px] text-slate-500">Upload one photo per rank, <b>in countdown order</b>: first image = #N (shown first) … last image = #1 (the winner).</p>
         </div>
 
         <!-- imageedit -->
@@ -221,6 +233,11 @@ $("#form").onsubmit = async (e) => {
     if($("#useScript").checked && f.custom_script.value.trim()){
       fd.append("custom_script", f.custom_script.value);
     }
+  } else if(MODE==="countdown"){
+    fd.append("topic", f.topic_cd.value||"");
+    fd.append("clip_count", f.count_cd.value||"5");
+    [...f.images_cd.files].forEach(img => fd.append("images", img));
+    if(!f.images_cd.files.length){ $("#formErr").textContent="Upload player photos (in countdown order)."; return; }
   } else { // imageedit
     [...f.images.files].forEach(img => fd.append("images", img));
     fd.append("title", f.title_img.value||"");

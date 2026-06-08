@@ -6,7 +6,7 @@ from pathlib import Path
 from . import ffmpeg_utils
 from . import beats as beats_mod
 from .transcriber import Word
-from .captions import build_ass, build_edit_ass
+from .captions import build_ass, build_edit_ass, build_countdown_ass
 
 # Output dimensions per aspect ratio. "original" keeps the source framing.
 ASPECTS: dict[str, tuple[int, int] | None] = {
@@ -505,5 +505,70 @@ def render_image_edit(
     if amap:
         args += ["-map", amap]
     args += ["-t", f"{total:.3f}", *_ENCODE, out_path.name]
+    ffmpeg_utils.run(args, cwd=out_dir)
+    return out_path
+
+
+def render_countdown(
+    segments: list[dict],
+    voice: Path,
+    out_path: Path,
+    *,
+    words: list[Word],
+    title: str = "",
+    music: str | Path | None = None,
+    music_volume: float = 0.28,
+) -> Path:
+    """Makaloozas-style countdown: a Ken Burns image per segment (intro + each
+    ranked item), beat to the narration, with the clean grade, glowing centred
+    captions, per-item name-cards + gold #rank badges, and the title during the
+    intro. `segments` items are {start, end, kind, tag, rank, visual(image Path)}.
+    Music is ducked under the voiceover. Returns out_path."""
+    out_dir = out_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    voice = Path(voice).resolve()
+    total = round(max(s["end"] for s in segments), 3)
+
+    inputs: list[str] = []
+    segf: list[str] = []
+    for i, seg in enumerate(segments):
+        img = Path(seg["visual"]).resolve()
+        d = max(0.6, seg["end"] - seg["start"])
+        frames = max(2, int(round(d * FPS)))
+        inputs += ["-i", str(img)]
+        zexpr = ("z='min(zoom+0.0010,1.16)'" if i % 2 == 0
+                 else "z='if(eq(on,0),1.16,max(zoom-0.0010,1.0))'")
+        segf.append(
+            f"[{i}:v]scale={EDIT_W}:{EDIT_H}:force_original_aspect_ratio=increase,"
+            f"crop={EDIT_W}:{EDIT_H},setsar=1,"
+            f"zoompan={zexpr}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+            f"d={frames}:s={EDIT_W}x{EDIT_H}:fps={FPS}[v{i}]"
+        )
+    concat_in = "".join(f"[v{i}]" for i in range(len(segments)))
+    graph = ";".join(segf) + f";{concat_in}concat=n={len(segments)}:v=1:a=0,{_GRADE}"
+
+    ass = out_dir / f"{out_path.stem}.ass"
+    build_countdown_ass(ass, words=words, segments=segments, title=title,
+                        play_w=EDIT_W, play_h=EDIT_H)
+    graph += f",ass={ass.name}[outv]"
+
+    n = len(segments)
+    args = list(inputs) + ["-i", str(voice)]          # voice = input n
+    voice_idx = n
+    music_path = Path(music).resolve() if music else None
+    if music_path and music_path.exists():
+        args += ["-stream_loop", "-1", "-i", str(music_path)]   # music = input n+1
+        vol = max(0.0, min(1.0, music_volume))
+        graph += (
+            f";[{n + 1}:a]volume={vol:.2f}[mq];"
+            f"[mq][{voice_idx}:a]sidechaincompress=threshold=0.05:ratio=6:attack=20:release=400[md];"
+            f"[{voice_idx}:a][md]amix=inputs=2:duration=first:normalize=0[aout]"
+        )
+        amap = "[aout]"
+    else:
+        amap = f"{voice_idx}:a"
+
+    args += ["-filter_complex", graph, "-map", "[outv]", "-map", amap,
+             "-t", f"{total:.3f}", *_ENCODE, out_path.name]
     ffmpeg_utils.run(args, cwd=out_dir)
     return out_path

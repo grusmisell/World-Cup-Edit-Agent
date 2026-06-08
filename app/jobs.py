@@ -456,6 +456,98 @@ def _run_imageedit(job: Job, work_dir: Path, clips_dir: Path) -> None:
     job.set_stage("done", "Done. Image edit ready.")
 
 
+# --- COUNTDOWN mode (Makaloozas-style ranked list) -------------------------
+
+def _run_countdown(job: Job, work_dir: Path, clips_dir: Path) -> None:
+    if not settings.anthropic_api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to your .env file.")
+    imgs = _job_images(job)
+    if not imgs:
+        raise RuntimeError(
+            "Upload player/team images (in countdown order, #N first) for a countdown edit."
+        )
+    niche = job.niche or football.DEFAULT_NICHE
+    n = max(3, min(10, job.clip_count or 5))
+    job.set_stage("scripting", f"Writing the top {n} countdown...")
+    script = football.countdown_script(
+        job.topic or f"top {n} at the {niche}", n,
+        api_key=settings.anthropic_api_key, model=settings.claude_model,
+        niche=niche, web_search=True,
+    )
+    items = script.items[:n]
+    voice = job.voice or football.MOODS["hype"]["voices"][0]
+
+    seg_specs = [("intro", script.intro, None, None)]
+    for it in items:
+        # The name-card shows the actual team/player NAME (not a creative tag).
+        seg_specs.append(("item", f"Number {it['rank']}. {it['name']}. {it['blurb']}",
+                          it["name"][:18], it["rank"]))
+
+    import tempfile, shutil as _sh
+    cursor = 0.0
+    seg_audio: list[Path] = []
+    all_words: list = []
+    segments: list[dict] = []
+    # Transcribe in the system temp dir (NOT the OneDrive-synced job dir): the rapid
+    # back-to-back whisper_out.json writes here otherwise hit OneDrive file locks.
+    tr_dir = Path(tempfile.mkdtemp(prefix="cd_tr_"))
+    try:
+        for si, (kind, text, tag, rank) in enumerate(seg_specs):
+            job.set_stage("voicing", f"Voicing {si + 1}/{len(seg_specs)}...")
+            job.progress = 0.10 + 0.6 * (si / len(seg_specs))
+            job.save()
+            ap = voiceover.synthesize(text, work_dir / f"seg_{si:02d}.mp3", voice=voice)
+            tr = transcriber.transcribe(ap, tr_dir, model_size=settings.whisper_model)
+            d = max(0.6, ffmpeg_utils.probe_duration(ap))
+            for w in tr.words:
+                all_words.append(transcriber.Word(w.text, w.start + cursor, w.end + cursor))
+            seg_audio.append(ap)
+            segments.append({"start": round(cursor, 3), "end": round(cursor + d, 3),
+                             "kind": kind, "tag": tag, "rank": rank})
+            cursor += d
+    finally:
+        _sh.rmtree(tr_dir, ignore_errors=True)
+
+    # Concatenate the per-segment narration into one voice track.
+    voice_path = work_dir / "voice.mp3"
+    a_in: list[str] = []
+    for ap in seg_audio:
+        a_in += ["-i", str(ap)]
+    concat_f = "".join(f"[{i}:a]" for i in range(len(seg_audio))) + \
+        f"concat=n={len(seg_audio)}:v=0:a=1[a]"
+    ffmpeg_utils.run([*a_in, "-filter_complex", concat_f, "-map", "[a]",
+                      "-c:a", "libmp3lame", voice_path.name], cwd=work_dir)
+
+    # Assign one image per segment (items in countdown order; intro uses the first).
+    ic = 0
+    for seg in segments:
+        if seg["kind"] == "item":
+            seg["visual"] = str(imgs[ic % len(imgs)])
+            ic += 1
+        else:
+            seg["visual"] = str(imgs[0])
+
+    music = _resolve_music(job) or (_all_music()[0] if _all_music() else None)
+    job.set_stage("clipping", "Compositing the countdown...")
+    filename = "clip_01.mp4"
+    clipper.render_countdown(
+        segments, voice_path, clips_dir / filename, words=all_words,
+        title=script.title, music=music, music_volume=settings.music_volume,
+    )
+    dur = ffmpeg_utils.probe_duration(clips_dir / filename)
+    tags = ["worldcup2026", "football", f"top{n}", "ranking", "fyp"]
+    job.clips.append(ClipResult(
+        index=1, title=script.title, hook=script.intro, score=0,
+        reason=f"Countdown · top {n} · {len(imgs)} image(s)",
+        start=0.0, end=round(dur, 2), duration=round(dur, 2), filename=filename,
+        hashtags=tags, edit_style="countdown",
+        captions=[{"caption": script.title, "hashtags": tags}],
+    ))
+    job.title = script.title
+    job.status = "done"
+    job.set_stage("done", "Done. Countdown ready.")
+
+
 # --- HIGHLIGHTS mode -------------------------------------------------------
 
 def _run_pipeline(job: Job, local_path: Path | None) -> None:
@@ -470,6 +562,9 @@ def _run_pipeline(job: Job, local_path: Path | None) -> None:
             return
         if job.source_type == "imageedit":
             _run_imageedit(job, work_dir, clips_dir)
+            return
+        if job.source_type == "countdown":
+            _run_countdown(job, work_dir, clips_dir)
             return
 
         # highlights mode: acquire the source video.

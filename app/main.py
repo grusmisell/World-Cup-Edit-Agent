@@ -279,6 +279,33 @@ async def create_job(
         )
         return JSONResponse({"id": job.id})
 
+    # COUNTDOWN mode: a ranked "Top N" voiceover edit over uploaded player images.
+    if mode == "countdown":
+        names: list[str] = []
+        for up in images or []:
+            if not up or not up.filename:
+                continue
+            ext = Path(up.filename).suffix.lower()
+            if ext not in _IMAGE_EXTS:
+                continue
+            dest = IMAGES_DIR / f"{Path(up.filename).stem}_{_rand()}{ext}"
+            with dest.open("wb") as out:
+                shutil.copyfileobj(up.file, out)
+            names.append(dest.name)
+        if not names and not _list_images():
+            raise HTTPException(400, "Upload player/team images (in countdown order) for a countdown.")
+        job = jobs_mod.create_job(
+            source_type="countdown",
+            source=(topic or niche),
+            clip_count=max(3, min(10, int(clip_count))),   # number of ranked items
+            music=music,
+            niche=niche,
+            topic=(topic or "").strip()[:300],
+            voice=voice,
+            images=names,
+        )
+        return JSONResponse({"id": job.id})
+
     # HIGHLIGHTS mode: a match/highlights video (file or URL) -> football edits.
     if file is not None and file.filename:
         ext = Path(file.filename).suffix.lower()

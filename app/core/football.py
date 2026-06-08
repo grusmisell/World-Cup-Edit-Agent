@@ -173,6 +173,71 @@ def script_to_news(
     )
 
 
+@dataclass
+class CountdownScript:
+    title: str
+    intro: str
+    items: list[dict]   # each: {rank:int, name:str, tag:str, blurb:str}
+
+
+def countdown_script(
+    topic: str,
+    count: int,
+    *,
+    api_key: str,
+    model: str,
+    niche: str = DEFAULT_NICHE,
+    web_search: bool = True,
+) -> CountdownScript:
+    """Write a ranked 'Top N' countdown (like the Makaloozas edits): a hook intro
+    plus one entry per rank (label + a tight spoken blurb), ordered from rank N
+    down to 1. Uses web search for current accuracy when enabled."""
+    count = max(3, min(10, count))
+    topic = (topic or f"top {count} teams at the 2026 World Cup").strip()
+    search_line = "Use web search for current, accurate info. " if web_search else ""
+    prompt = (
+        f"Write a TOP {count} countdown for a {niche} short-form video about: {topic}. "
+        f"{search_line}Rank from {count} (shown first) DOWN to 1 (the best, shown last). "
+        f"Give a SHORT one-line intro hook (max 12 words), then for each rank a short "
+        f"on-screen label and a PUNCHY spoken blurb (STRICTLY max 14 words) on why it ranks "
+        f"there. Conversational, hype, no filler, no emojis. Keep it tight so the whole video "
+        f"is ~45 seconds.\n\n"
+        f'Return ONLY JSON: {{"title": "<max 60 chars>", "intro": "<1-sentence hook>", '
+        f'"items": [{{"rank": <int>, "name": "<team or player>", '
+        f'"tag": "<2-18 char on-screen label>", "blurb": "<why it ranks here>"}}]}} '
+        f"with items ordered rank {count} first down to rank 1 last. No text outside the JSON."
+    )
+    tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 4}] if web_search else []
+    resp = _client(api_key).messages.create(
+        model=model, max_tokens=2500,
+        messages=[{"role": "user", "content": prompt}], tools=tools,
+    )
+    raw = "".join(b.text for b in resp.content if b.type == "text")
+    data = _extract_json(raw)
+    items: list[dict] = []
+    for it in data.get("items", []):
+        try:
+            rank = int(it.get("rank"))
+        except (TypeError, ValueError):
+            continue
+        name = str(it.get("name", "")).strip()[:60]
+        if not name:
+            continue
+        items.append({
+            "rank": rank, "name": name,
+            "tag": (str(it.get("tag") or name).strip()[:18]).upper(),
+            "blurb": str(it.get("blurb", "")).strip()[:300],
+        })
+    items.sort(key=lambda x: -x["rank"])   # countdown: high rank first
+    if not items:
+        raise RuntimeError("The countdown generator returned no items.")
+    return CountdownScript(
+        title=str(data.get("title", topic))[:80],
+        intro=str(data.get("intro", "")).strip() or f"The top {count}.",
+        items=items,
+    )
+
+
 def trending_subjects(
     count: int,
     *,
