@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>World Cup Edit Agent ⚽</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: radial-gradient(1200px 600px at 50% -10%, #15324a 0%, #0b1220 55%, #070b14 100%); }
+    .card { background: rgba(17,24,39,.72); backdrop-filter: blur(6px); }
+    .tabsel { background: linear-gradient(90deg,#16a34a,#0ea5e9); color:#fff; }
+    video { background:#000; }
+    .pill { transition: all .15s; }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <header class="mb-6 flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h1 class="text-3xl font-black tracking-tight">⚽ World Cup Edit Agent</h1>
+        <p class="text-slate-400 text-sm mt-1">Beat-synced highlight edits · AI news edits · photo edits — for TikTok / Reels / Shorts</p>
+      </div>
+      <div id="health" class="text-xs text-slate-400 text-right leading-5"></div>
+    </header>
+
+    <!-- Mode tabs -->
+    <div class="flex gap-2 mb-5">
+      <button data-mode="highlights" class="modebtn tabsel px-4 py-2 rounded-xl font-semibold text-sm">🎬 Highlights edit</button>
+      <button data-mode="news" class="modebtn bg-slate-800 px-4 py-2 rounded-xl font-semibold text-sm">📰 News edit</button>
+      <button data-mode="imageedit" class="modebtn bg-slate-800 px-4 py-2 rounded-xl font-semibold text-sm">🖼️ Photo edit</button>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <!-- ============ FORM ============ -->
+      <form id="form" class="card rounded-2xl p-5 space-y-4 border border-white/5">
+
+        <!-- highlights -->
+        <div data-for="highlights" class="space-y-3">
+          <p class="text-sm text-slate-300">Paste a highlights / match video URL (YouTube etc.) or upload a file. Claude finds the goals & big moments from the commentary and edits them.</p>
+          <input name="url" type="url" placeholder="https://youtube.com/watch?v=..." class="w-full bg-slate-900/70 rounded-lg px-3 py-2 text-sm border border-white/10" />
+          <div class="text-center text-xs text-slate-500">— or —</div>
+          <input name="file" type="file" accept="video/*" class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-600 file:text-white" />
+          <div class="grid grid-cols-2 gap-3">
+            <label class="text-xs text-slate-400">Edit style
+              <select name="edit_style" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10">
+                <option value="football_edit">🔥 Football edit (beat-synced, graded)</option>
+                <option value="clean">Clean captioned clip</option>
+              </select>
+            </label>
+            <label class="text-xs text-slate-400">Reframe
+              <select name="reframe" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10">
+                <option value="fill">Fill (tight crop)</option>
+                <option value="fit">Fit (blurred bars)</option>
+              </select>
+            </label>
+            <label class="text-xs text-slate-400">How many edits
+              <input name="clip_count" type="number" min="1" max="20" value="6" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
+            </label>
+            <label class="text-xs text-slate-400">Length (s)
+              <div class="flex gap-1 mt-1">
+                <input name="min_seconds" type="number" min="5" max="170" value="10" class="w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
+                <input name="max_seconds" type="number" min="10" max="180" value="45" class="w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- news -->
+        <div data-for="news" class="space-y-3 hidden">
+          <p class="text-sm text-slate-300">Enter players / countries / storylines (one per line). Claude web-searches the latest news and makes an AI-voiced edit over football B-roll. Leave blank to auto-pick what's trending.</p>
+          <textarea name="topic_news" rows="4" placeholder="Kylian Mbappe&#10;USA World Cup squad&#10;Argentina" class="w-full bg-slate-900/70 rounded-lg px-3 py-2 text-sm border border-white/10"></textarea>
+          <label class="text-xs text-slate-400">How many news edits
+            <input name="clip_count_news" type="number" min="1" max="20" value="3" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
+          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="text-xs text-slate-400">Mood
+              <select name="mood" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10">
+                <option value="">Auto (rotate)</option>
+              </select>
+            </label>
+            <label class="text-xs text-slate-400">Voice (manual mood)
+              <select name="voice" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10"><option value="">Auto</option></select>
+            </label>
+          </div>
+        </div>
+
+        <!-- imageedit -->
+        <div data-for="imageedit" class="space-y-3 hidden">
+          <p class="text-sm text-slate-300">Upload player photos — they're cut to the beat with Ken Burns motion + a cinematic grade over music. (Use your own/licensed images.)</p>
+          <input name="images" type="file" accept="image/*" multiple class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-600 file:text-white" />
+          <input name="title_img" type="text" placeholder="Title (top strip, optional)" class="w-full bg-slate-900/70 rounded-lg px-3 py-2 text-sm border border-white/10" />
+          <input name="topic_img" type="text" placeholder="Name tag (big bottom text, e.g. MESSI)" class="w-full bg-slate-900/70 rounded-lg px-3 py-2 text-sm border border-white/10" />
+        </div>
+
+        <!-- shared: music + background -->
+        <div class="grid grid-cols-2 gap-3 pt-2 border-t border-white/10">
+          <label class="text-xs text-slate-400">Music bed
+            <select name="music" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10"><option value="">None</option></select>
+          </label>
+          <label data-for="highlights news" class="text-xs text-slate-400">Background (news)
+            <select name="background" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10"><option value="">Auto</option></select>
+          </label>
+          <label data-for="highlights news" class="text-xs text-slate-400">Caption style
+            <select name="caption_style" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10">
+              <option value="bold_yellow">Bold yellow</option>
+              <option value="classic">Classic white</option>
+              <option value="boxed">Boxed</option>
+              <option value="centered">Centered</option>
+            </select>
+          </label>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <button id="fetchBroll" type="button" class="hidden text-xs text-sky-400 hover:text-sky-300 underline">⬇ Fetch football B-roll (Pexels)</button>
+          <button id="go" type="submit" class="ml-auto bg-gradient-to-r from-green-500 to-sky-500 hover:from-green-400 hover:to-sky-400 px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg">Generate ⚽</button>
+        </div>
+        <p id="formErr" class="text-rose-400 text-xs"></p>
+      </form>
+
+      <!-- ============ STATUS / RESULTS ============ -->
+      <div class="space-y-4">
+        <div id="progress" class="card rounded-2xl p-5 border border-white/5 hidden">
+          <div class="flex justify-between text-sm mb-2"><span id="pStage" class="font-semibold">Working…</span><span id="pPct" class="text-slate-400"></span></div>
+          <div class="h-2 bg-slate-800 rounded-full overflow-hidden"><div id="pBar" class="h-full bg-gradient-to-r from-green-500 to-sky-500 w-0 transition-all"></div></div>
+          <p id="pMsg" class="text-xs text-slate-400 mt-2"></p>
+        </div>
+        <div id="results" class="space-y-4"></div>
+        <div class="card rounded-2xl p-4 border border-white/5">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-sm">Recent jobs</h3><button id="refreshJobs" class="text-xs text-slate-400 hover:text-slate-200">↻</button></div>
+          <div id="jobs" class="text-sm space-y-1 max-h-56 overflow-auto"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+let MODE = "highlights";
+let YT = false;
+const PLATFORMS = ["tiktok","instagram","youtube"];
+
+function setMode(m){
+  MODE = m;
+  $$(".modebtn").forEach(b => b.classList.toggle("tabsel", b.dataset.mode===m) || b.classList.toggle("bg-slate-800", b.dataset.mode!==m));
+  $$("[data-for]").forEach(el => {
+    el.classList.toggle("hidden", !el.dataset.for.split(" ").includes(m));
+  });
+  $("#fetchBroll").classList.toggle("hidden", !(m==="news"));
+}
+$$(".modebtn").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+
+async function jget(u){ const r = await fetch(u); return r.ok ? r.json() : null; }
+
+async function boot(){
+  const h = await jget("/api/health");
+  if(h){ $("#health").innerHTML = `API key ${h.anthropic_key_set?'✅':'❌'} · whisper:${h.whisper_model}`; }
+  const [bg, mu, vo, mo, px, yt] = await Promise.all([
+    jget("/api/backgrounds"), jget("/api/music"), jget("/api/voices"), jget("/api/moods"),
+    jget("/api/pexels/status"), jget("/api/youtube/status")
+  ]);
+  fill($("[name=background]"), (bg?.backgrounds)||[], "Auto");
+  fill($("[name=music]"), (mu?.music)||[], "None");
+  if(vo?.voices){ const s=$("[name=voice]"); Object.entries(vo.voices).forEach(([id,label])=>{const o=document.createElement("option");o.value=id;o.textContent=label;s.appendChild(o);}); }
+  if(mo?.moods){ const s=$("[name=mood]"); Object.entries(mo.moods).forEach(([k,label])=>{const o=document.createElement("option");o.value=k;o.textContent=label;s.appendChild(o);}); const man=document.createElement("option");man.value="manual";man.textContent="Manual";s.appendChild(man); }
+  if(px?.configured){ $("#fetchBroll").dataset.ok="1"; } else { $("#fetchBroll").textContent="Set PEXELS_API_KEY in .env to fetch B-roll"; $("#fetchBroll").classList.add("pointer-events-none","opacity-60"); }
+  YT = !!(yt?.configured);
+  loadJobs();
+}
+function fill(sel, items, first){
+  if(!sel) return;
+  sel.innerHTML = `<option value="">${first}</option>` + items.map(x=>`<option value="${x}">${x}</option>`).join("");
+}
+
+$("#fetchBroll").onclick = async () => {
+  if($("#fetchBroll").dataset.ok!=="1") return;
+  $("#fetchBroll").textContent = "Fetching…";
+  const r = await fetch("/api/pexels/fetch", {method:"POST"});
+  const d = await r.json().catch(()=>null);
+  if(d?.backgrounds){ fill($("[name=background]"), d.backgrounds, "Auto"); $("#fetchBroll").textContent = `✓ Got ${d.saved?.length||0} clips`; }
+  else { $("#fetchBroll").textContent = "Fetch failed"; }
+};
+
+$("#form").onsubmit = async (e) => {
+  e.preventDefault();
+  $("#formErr").textContent = "";
+  const f = e.target;
+  const fd = new FormData();
+  fd.append("mode", MODE);
+  fd.append("music", f.music.value||"");
+  fd.append("background", f.background.value||"");
+  fd.append("caption_style", f.caption_style.value||"bold_yellow");
+  if(MODE==="highlights"){
+    if(f.url.value) fd.append("url", f.url.value);
+    if(f.file.files[0]) fd.append("file", f.file.files[0]);
+    if(!f.url.value && !f.file.files[0]){ $("#formErr").textContent="Add a URL or upload a video."; return; }
+    fd.append("edit_style", f.edit_style.value);
+    fd.append("reframe", f.reframe.value);
+    fd.append("clip_count", f.clip_count.value);
+    fd.append("min_seconds", f.min_seconds.value);
+    fd.append("max_seconds", f.max_seconds.value);
+  } else if(MODE==="news"){
+    fd.append("topic", f.topic_news.value||"");
+    fd.append("clip_count", f.clip_count_news.value||"3");
+    fd.append("mood", f.mood.value||"");
+    fd.append("voice", f.voice.value||"");
+  } else { // imageedit
+    [...f.images.files].forEach(img => fd.append("images", img));
+    fd.append("title", f.title_img.value||"");
+    fd.append("topic", f.topic_img.value||"");
+    if(!f.images.files.length){ $("#formErr").textContent="Upload at least one photo."; return; }
+  }
+  $("#go").disabled = true; $("#go").textContent = "Starting…";
+  const r = await fetch("/api/jobs", {method:"POST", body: fd});
+  const d = await r.json().catch(()=>null);
+  $("#go").disabled = false; $("#go").textContent = "Generate ⚽";
+  if(!r.ok){ $("#formErr").textContent = (d&&d.detail)||"Failed to start."; return; }
+  watch(d.id);
+};
+
+let timer=null;
+async function watch(id){
+  $("#results").innerHTML=""; $("#progress").classList.remove("hidden");
+  clearInterval(timer);
+  const poll = async () => {
+    const j = await jget("/api/jobs/"+id);
+    if(!j) return;
+    const pct = Math.round((j.progress||0)*100);
+    $("#pStage").textContent = (j.stage||"").replace(/^\w/,c=>c.toUpperCase());
+    $("#pPct").textContent = pct+"%";
+    $("#pBar").style.width = pct+"%";
+    $("#pMsg").textContent = j.message||"";
+    if(j.status==="done"){ clearInterval(timer); $("#progress").classList.add("hidden"); render(j); loadJobs(); }
+    else if(j.status==="error"){ clearInterval(timer); $("#pStage").textContent="Error"; $("#pBar").classList.add("bg-rose-500"); $("#pMsg").textContent=j.error||"Failed"; }
+  };
+  timer = setInterval(poll, 1500); poll();
+}
+
+function escapeHtml(s){ return (s||"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function render(j){
+  const v = Date.now();
+  const head = `<div class="flex items-center justify-between"><h2 class="font-bold">${escapeHtml(j.title||"Edits")} <span class="text-slate-500 text-sm">· ${j.clips.length} clip(s)</span></h2>
+     <a href="/api/jobs/${j.id}/download-all" class="text-xs bg-slate-800 px-3 py-1.5 rounded-lg hover:bg-slate-700">⬇ Download all</a></div>`;
+  const cards = j.clips.map(c => {
+    const tags = (c.captions?.[0]?.hashtags || c.hashtags || []).map(t=>"#"+t).join(" ");
+    const cap = (c.captions?.[0]?.caption) || c.title;
+    const chips = PLATFORMS.map(p => {
+      const on = (c.posted_to||[]).includes(p);
+      return `<button class="pill px-2 py-1 rounded text-[11px] ${on?'bg-green-600':'bg-slate-700'}" onclick="togglePosted('${j.id}','${c.filename}','${p}',this)">${p}${on?' ✓':''}</button>`;
+    }).join("");
+    const src = (c.sources||[]).slice(0,2).map(u=>`<a href="${escapeHtml(u)}" target="_blank" class="underline text-sky-400">source</a>`).join(" · ");
+    const ytBtn = YT ? `<button onclick="pubYT('${j.id}','${c.filename}',this)" class="text-[11px] bg-red-600 hover:bg-red-500 px-2 py-1 rounded">⤴ YouTube</button>` : "";
+    return `<div class="card rounded-xl p-3 border border-white/5 flex gap-3">
+      <video src="/api/jobs/${j.id}/clips/${c.filename}?v=${v}" controls preload="metadata" class="w-28 rounded-lg shrink-0" style="aspect-ratio:9/16"></video>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-sm truncate">${escapeHtml(c.title)}</div>
+        ${c.name_tag?`<div class="text-[11px] text-amber-400">🏷️ ${escapeHtml(c.name_tag)}</div>`:""}
+        <div class="text-[11px] text-slate-400 mt-1 line-clamp-2">${escapeHtml(cap)} <span class="text-sky-400">${escapeHtml(tags)}</span></div>
+        ${src?`<div class="text-[11px] mt-1">${src}</div>`:""}
+        <div class="flex flex-wrap gap-1.5 mt-2 items-center">
+          <a href="/api/jobs/${j.id}/clips/${c.filename}?download=true" class="text-[11px] bg-sky-600 hover:bg-sky-500 px-2 py-1 rounded">⬇</a>
+          <button class="copycap text-[11px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded" data-cap="${escapeHtml((cap+"\n\n"+tags).trim())}">Copy caption</button>
+          ${ytBtn}
+          <span class="text-slate-600 text-[11px]">post:</span> ${chips}
+        </div>
+      </div></div>`;
+  }).join("");
+  $("#results").innerHTML = head + cards;
+  $$(".copycap").forEach(b => b.onclick = () => {
+    navigator.clipboard.writeText(b.dataset.cap||"");
+    const o=b.textContent; b.textContent="Copied!"; setTimeout(()=>b.textContent=o,1200);
+  });
+}
+window.togglePosted = async (id, file, plat, btn) => {
+  const on = !btn.classList.contains("bg-green-600");
+  await fetch(`/api/jobs/${id}/clips/${file}/posted`, {method:"POST", body:new URLSearchParams({platform:plat, posted:on})});
+  btn.classList.toggle("bg-green-600", on); btn.classList.toggle("bg-slate-700", !on);
+  btn.textContent = plat + (on?" ✓":"");
+};
+window.pubYT = async (id, file, btn) => {
+  btn.textContent="…"; const r = await fetch(`/api/jobs/${id}/clips/${file}/youtube`, {method:"POST"});
+  const d = await r.json().catch(()=>null);
+  btn.textContent = r.ok ? "✓ YT" : "YT failed";
+};
+
+async function loadJobs(){
+  const list = await jget("/api/jobs"); if(!list) return;
+  $("#jobs").innerHTML = list.slice(0,12).map(j => {
+    const ic = {done:"✅",error:"❌",running:"⏳",queued:"⏳"}[j.status]||"·";
+    return `<div class="flex justify-between gap-2 hover:bg-white/5 rounded px-2 py-1 cursor-pointer" onclick="openJob('${j.id}')">
+      <span class="truncate">${ic} ${escapeHtml(j.title||j.source||j.source_type)}</span>
+      <span class="text-slate-500 text-xs shrink-0">${j.source_type} · ${j.clips.length}</span></div>`;
+  }).join("") || '<p class="text-slate-500 text-xs">No jobs yet.</p>';
+}
+window.openJob = async (id) => { const j = await jget("/api/jobs/"+id); if(j && j.status==="done") render(j); else if(j) watch(id); };
+$("#refreshJobs").onclick = loadJobs;
+
+setMode("highlights");
+boot();
+</script>
+</body>
+</html>

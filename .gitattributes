@@ -1,0 +1,12 @@
+# Normalize line endings: store text files with LF in the repo.
+* text=auto eol=lf
+
+# Windows batch scripts must keep CRLF to run correctly.
+*.bat text eol=crlf
+
+# Never alter these (treat as binary).
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.bin binary
+*.exe binary

@@ -1,0 +1,19 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+jinja2>=3.1
+pydantic-settings>=2.2
+yt-dlp>=2024.0.0
+# Transcription runs via the bundled whisper.cpp binary (bin/whisper/Release/whisper-cli.exe),
+# not a Python package: native Python ML runtimes (ctranslate2, torch) crash on Python 3.14.
+anthropic>=0.40.0
+opencv-python-headless>=4.9
+imageio-ffmpeg>=0.4.9
+# AI Voiceover mode: free Microsoft neural TTS (no API key).
+edge-tts>=7.0
+# Beat / onset detection for music-synced football edits (no native ML runtime).
+numpy>=1.26
+# Optional: YouTube auto-upload (only needed if you use the "Publish to YouTube" button).
+google-api-python-client>=2.100
+google-auth-oauthlib>=1.2
+google-auth-httplib2>=0.2
