@@ -233,6 +233,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     return out_path
 
 
+# Countdown caption: glow style placed in the UPPER-MIDDLE (alignment 8 = from top)
+# so the word captions sit clear above the bottom name-card / rank badge.
+CD_CAPTION = {
+    "fontname": "Arial", "fontsize": 92, "primary": "&H00FFFFFF",
+    "outline_col": "&H00101010", "back": "&H50000000", "bold": -1,
+    "borderstyle": 1, "outline": 4, "shadow": 0, "alignment": 8, "marginv": 700,
+}
 # Countdown name-card label (bottom centre) + accent rank badge above it + top title.
 CD_NAME = {
     "fontname": "Arial", "fontsize": 104, "primary": "&H00FFFFFF",
@@ -267,7 +274,7 @@ def build_countdown_ass(
     def mv(p):  # scale a preset margin to this height
         return round(p["marginv"] * play_h / REF_H)
     style_lines = [
-        _style_line(STYLES["glow"], mv(STYLES["glow"]), name="Pop"),
+        _style_line(CD_CAPTION, mv(CD_CAPTION), name="Pop"),
         _style_line(CD_NAME, mv(CD_NAME), name="CName"),
         _style_line(CD_RANK, mv(CD_RANK), name="CRank"),
         _style_line(CD_TITLE, mv(CD_TITLE), name="CTitle"),

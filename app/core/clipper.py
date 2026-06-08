@@ -599,10 +599,15 @@ def render_montage(
         vis = Path(seg["visual"]).resolve()
         d = max(0.6, seg["end"] - seg["start"])
         inputs += ["-i", str(vis)]
+        # Zoom-blur transition at each cut: a fast zoom-punch that settles over the
+        # first ~7 frames + a blur flash on the first ~5 frames of every segment.
         segf.append(
             f"[{i}:v]trim=duration={d:.3f},setpts=PTS-STARTPTS,fps={FPS},"
             f"scale={EDIT_W}:{EDIT_H}:force_original_aspect_ratio=increase,"
-            f"crop={EDIT_W}:{EDIT_H},setsar=1[v{i}]"
+            f"crop={EDIT_W}:{EDIT_H},setsar=1,"
+            f"zoompan=z='if(lt(on,7),1.20-0.20*on/7,1.0)':x='iw/2-(iw/zoom/2)':"
+            f"y='ih/2-(ih/zoom/2)':d=1:s={EDIT_W}x{EDIT_H}:fps={FPS},"
+            f"gblur=sigma=18:enable='lt(n,5)'[v{i}]"
         )
     concat_in = "".join(f"[v{i}]" for i in range(len(segments)))
     graph = ";".join(segf) + f";{concat_in}concat=n={len(segments)}:v=1:a=0,{_GRADE}"
