@@ -205,6 +205,7 @@ async def create_job(
     caption_style: str = Form(default=settings.default_caption_style),
     background: str = Form(default=""),
     music: str = Form(default=settings.default_music),
+    bpm: int = Form(default=0),
     niche: str = Form(default=settings.default_niche),
     trend_match: bool = Form(default=False),
     gen_captions: bool = Form(default=settings.default_gen_captions),
@@ -236,9 +237,12 @@ async def create_job(
     background = Path(background).name if background else ""
     if background and background not in _list_backgrounds():
         background = ""
+    # "none" means render clean (so the user adds a trending sound in-app).
+    no_music = (music or "").strip().lower() in ("none", "__none__")
     music = Path(music).name if music else ""
-    if music and music not in _list_music():
+    if no_music or (music and music not in _list_music()):
         music = ""
+    bpm = max(0, min(220, int(bpm)))
     niche = (niche or "").strip()[:80] or DEFAULT_NICHE
     min_seconds = max(5, min(170, int(min_seconds)))
     max_seconds = max(min_seconds + 5, min(180, int(max_seconds)))
@@ -258,6 +262,7 @@ async def create_job(
             caption_style=caption_style,
             background=background,
             music=music,
+            no_music=no_music,
             niche=niche,
             topic=(topic or "").strip()[:2000],
             voice=voice,
@@ -287,6 +292,7 @@ async def create_job(
             source_type="imageedit",
             source="images",
             music=music,
+            no_music=no_music,
             niche=niche,
             topic=(topic or "").strip()[:200],   # used as the name tag
             title=(title or "").strip()[:80],
@@ -313,6 +319,8 @@ async def create_job(
             source=(topic or niche),
             clip_count=max(3, min(10, int(clip_count))),   # number of ranked items
             music=music,
+            no_music=no_music,
+            bpm=bpm,
             niche=niche,
             topic=(topic or "").strip()[:300],
             voice=voice,

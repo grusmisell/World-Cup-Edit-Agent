@@ -347,6 +347,17 @@ def _zoom_punch(grid: "beats_mod.BeatGrid | None", punch: float) -> str:
     )
 
 
+def _beat_pulse(bpm: int, punch: float = 0.055) -> str:
+    """A continuous zoom pulse on every beat at `bpm` (phase 0 = video start), so the
+    edit feels on-beat when a song of that tempo is added at upload. For trap/half-time
+    bounce, pass roughly half the song's BPM."""
+    period = 60.0 / max(40, min(220, bpm))
+    return (
+        f"zoompan=z='1.0+{punch:.3f}*pow(max(0,cos(2*PI*(on/{FPS})/{period:.3f})),3)':"
+        f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={EDIT_W}x{EDIT_H}:fps={FPS}"
+    )
+
+
 def _edit_audio_args(
     have_orig_audio: bool, music: Path | None, music_volume: float, total: float
 ):
@@ -518,6 +529,7 @@ def render_countdown(
     title: str = "",
     music: str | Path | None = None,
     music_volume: float = 0.28,
+    bpm: int = 0,
 ) -> Path:
     """Makaloozas-style countdown: a Ken Burns image per segment (intro + each
     ranked item), beat to the narration, with the clean grade, glowing centred
@@ -545,7 +557,10 @@ def render_countdown(
             f"d={frames}:s={EDIT_W}x{EDIT_H}:fps={FPS}[v{i}]"
         )
     concat_in = "".join(f"[v{i}]" for i in range(len(segments)))
-    graph = ";".join(segf) + f";{concat_in}concat=n={len(segments)}:v=1:a=0,{_GRADE}"
+    graph = ";".join(segf) + f";{concat_in}concat=n={len(segments)}:v=1:a=0"
+    if bpm and bpm > 0:
+        graph += f",{_beat_pulse(bpm)}"
+    graph += f",{_GRADE}"
 
     ass = out_dir / f"{out_path.stem}.ass"
     build_countdown_ass(ass, words=words, segments=segments, title=title,
@@ -583,6 +598,7 @@ def render_montage(
     title: str = "",
     music: str | Path | None = None,
     music_volume: float = 0.28,
+    bpm: int = 0,
 ) -> Path:
     """Like render_countdown, but each segment's visual is a real VIDEO clip
     (auto-pulled player footage) instead of a still: trim each clip to its
@@ -610,7 +626,10 @@ def render_montage(
             f"gblur=sigma=18:enable='lt(n,5)'[v{i}]"
         )
     concat_in = "".join(f"[v{i}]" for i in range(len(segments)))
-    graph = ";".join(segf) + f";{concat_in}concat=n={len(segments)}:v=1:a=0,{_GRADE}"
+    graph = ";".join(segf) + f";{concat_in}concat=n={len(segments)}:v=1:a=0"
+    if bpm and bpm > 0:
+        graph += f",{_beat_pulse(bpm)}"
+    graph += f",{_GRADE}"
 
     ass = out_dir / f"{out_path.stem}.ass"
     build_countdown_ass(ass, words=words, segments=segments, title=title,

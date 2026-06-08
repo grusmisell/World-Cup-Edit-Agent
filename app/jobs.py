@@ -94,6 +94,8 @@ class Job:
     caption_style: str = settings.default_caption_style
     background: str = ""
     music: str = settings.default_music
+    no_music: bool = False    # render clean (to add a trending sound in-app)
+    bpm: int = 0              # beat-sync the edit's pulse to this tempo (0 = off)
     niche: str = settings.default_niche
     topic: str = ""           # news mode: subject(s), one per line
     voice: str = ""
@@ -188,6 +190,8 @@ def create_job(
     caption_style: str = settings.default_caption_style,
     background: str = "",
     music: str = settings.default_music,
+    no_music: bool = False,
+    bpm: int = 0,
     niche: str = settings.default_niche,
     trend_match: bool = False,
     gen_captions: bool = settings.default_gen_captions,
@@ -215,6 +219,8 @@ def create_job(
         caption_style=caption_style,
         background=background,
         music=music,
+        no_music=no_music,
+        bpm=bpm,
         niche=niche,
         trend_match=trend_match,
         gen_captions=gen_captions,
@@ -382,7 +388,7 @@ def _run_news(job: Job, work_dir: Path, clips_dir: Path) -> None:
             background, audio_path, clips_dir / filename,
             words=transcript.words, caption_style=job.caption_style,
             headline=script.title if settings.voiceover_headline else None,
-            music=music, music_volume=settings.music_volume,
+            music=None if job.no_music else music, music_volume=settings.music_volume,
         )
         dur = ffmpeg_utils.probe_duration(clips_dir / filename)
         bits = [f"News · {script.subject}", f"mood: {mood_label}", f"voice: {voice_name}"]
@@ -432,10 +438,10 @@ def _run_imageedit(job: Job, work_dir: Path, clips_dir: Path) -> None:
         raise RuntimeError(
             "No images found. Upload player photos, or drop them in data/images/."
         )
-    music = _resolve_music(job)
-    if music is None:
-        allm = _all_music()
-        music = allm[0] if allm else None
+    if job.no_music:
+        music = None
+    else:
+        music = _resolve_music(job) or (_all_music()[0] if _all_music() else None)
 
     name_tag = next((t.strip() for t in (job.topic or "").splitlines() if t.strip()), "")
     job.set_stage("clipping", f"Building image edit from {len(imgs)} photo(s)...")
@@ -531,7 +537,7 @@ def _run_countdown(job: Job, work_dir: Path, clips_dir: Path) -> None:
     ffmpeg_utils.run([*a_in, "-filter_complex", concat_f, "-map", "[a]",
                       "-c:a", "libmp3lame", voice_path.name], cwd=work_dir)
 
-    music = _resolve_music(job) or (_all_music()[0] if _all_music() else None)
+    music = None if job.no_music else (_resolve_music(job) or (_all_music()[0] if _all_music() else None))
     filename = "clip_01.mp4"
     if imgs:
         # Image montage (uploaded photos in countdown order; intro uses the first).
@@ -545,7 +551,7 @@ def _run_countdown(job: Job, work_dir: Path, clips_dir: Path) -> None:
         job.set_stage("clipping", "Compositing the countdown...")
         clipper.render_countdown(
             segments, voice_path, clips_dir / filename, words=all_words,
-            title=script.title, music=music, music_volume=0.42,
+            title=script.title, music=music, music_volume=0.42, bpm=job.bpm,
         )
     else:
         # Auto-pull a real ~12s clip per ranked item from YouTube.
@@ -573,7 +579,7 @@ def _run_countdown(job: Job, work_dir: Path, clips_dir: Path) -> None:
         job.set_stage("clipping", "Compositing the montage...")
         clipper.render_montage(
             segments, voice_path, clips_dir / filename, words=all_words,
-            title=script.title, music=music, music_volume=0.42,
+            title=script.title, music=music, music_volume=0.42, bpm=job.bpm,
         )
         import shutil as _sh2
         _sh2.rmtree(src_dir, ignore_errors=True)

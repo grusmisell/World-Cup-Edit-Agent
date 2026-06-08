@@ -96,9 +96,15 @@
         <div data-for="countdown" class="space-y-3 hidden">
           <p class="text-sm text-slate-300">Makaloozas-style ranked countdown: an AI voiceover ranks the top N (web-searched), and it <b>auto-pulls a real clip of each player/team from YouTube</b> — with name-cards, gold rank badges & glowing captions over real footage.</p>
           <input name="topic_cd" type="text" placeholder="Top 5 national teams to win the 2026 World Cup" class="w-full bg-slate-900/70 rounded-lg px-3 py-2 text-sm border border-white/10" />
-          <label class="text-xs text-slate-400 block">How many (top N)
-            <input name="count_cd" type="number" min="3" max="10" value="5" class="mt-1 w-32 bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
-          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="text-xs text-slate-400 block">How many (top N)
+              <input name="count_cd" type="number" min="3" max="10" value="5" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
+            </label>
+            <label class="text-xs text-slate-400 block">Beat-sync BPM (0 = off)
+              <input name="bpm_cd" type="number" min="0" max="220" value="0" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
+            </label>
+          </div>
+          <p class="text-[11px] text-slate-500">Beat-sync: set this to the tempo of the song you'll add in-app so the cuts pulse on the beat. For trap, try the half-time feel (~70-75). Pair with music = "None".</p>
           <details class="text-xs text-slate-400"><summary class="cursor-pointer">Optional: use my own photos/clips instead of auto-pull</summary>
             <input name="images_cd" type="file" accept="image/*" multiple class="mt-2 w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-600 file:text-white" />
             <p class="text-[11px] text-slate-500 mt-1">If you upload, use one photo per rank <b>in countdown order</b> (first = #N, last = #1).</p>
@@ -199,7 +205,9 @@ async function boot(){
       Object.entries(el.voices||{}).map(([id,name])=>`<option value="${id}">${name}</option>`).join("");
   }
   fill($("[name=background]"), (bg?.backgrounds)||[], "Auto");
-  fill($("[name=music]"), (mu?.music)||[], "None");
+  $("[name=music]").innerHTML = `<option value="">Auto (mood bed)</option>`
+    + `<option value="none">🔇 None — I'll add a sound in-app</option>`
+    + ((mu?.music)||[]).map(x=>`<option value="${x}">${x}</option>`).join("");
   if(vo?.voices){ const s=$("[name=voice]"); Object.entries(vo.voices).forEach(([id,label])=>{const o=document.createElement("option");o.value=id;o.textContent=label;s.appendChild(o);}); }
   if(mo?.moods){ const s=$("[name=mood]"); Object.entries(mo.moods).forEach(([k,label])=>{const o=document.createElement("option");o.value=k;o.textContent=label;s.appendChild(o);}); const man=document.createElement("option");man.value="manual";man.textContent="Manual";s.appendChild(man); }
   if(px?.configured){ $("#fetchBroll").dataset.ok="1"; } else { $("#fetchBroll").textContent="Set PEXELS_API_KEY in .env to fetch B-roll"; $("#fetchBroll").classList.add("pointer-events-none","opacity-60"); }
@@ -252,6 +260,7 @@ $("#form").onsubmit = async (e) => {
   } else if(MODE==="countdown"){
     fd.append("topic", f.topic_cd.value||"");
     fd.append("clip_count", f.count_cd.value||"5");
+    fd.append("bpm", f.bpm_cd.value||"0");
     [...f.images_cd.files].forEach(img => fd.append("images", img));
     if(!f.topic_cd.value.trim()){ $("#formErr").textContent="Enter a countdown topic (e.g. 'Top 5 players')."; return; }
   } else { // imageedit
