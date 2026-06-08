@@ -25,8 +25,8 @@ MOODS: dict[str, dict] = {
         "label": "Hype",
         "tone": "Explosive, fast-paced hype-man energy: short exclamatory lines, "
                 "build to a peak, like a viral football edit voiceover.",
-        "voices": ["en-US-BrianNeural", "en-GB-RyanNeural", "en-US-GuyNeural",
-                   "en-AU-WilliamNeural"],
+        "voices": ["en-US-BrianMultilingualNeural", "en-US-AndrewMultilingualNeural",
+                   "en-AU-WilliamMultilingualNeural"],
         "music_kw": ["trap", "drill", "hype", "epic", "phonk", "edm", "trailer"],
         "bg_kw": ["stadium", "crowd", "football", "soccer", "fireworks", "action"],
     },
@@ -34,8 +34,8 @@ MOODS: dict[str, dict] = {
         "label": "Analysis",
         "tone": "Sharp, confident pundit delivery: clear, punchy analysis with "
                 "authority, like a tactics breakdown.",
-        "voices": ["en-GB-RyanNeural", "en-US-AndrewNeural", "en-US-ChristopherNeural",
-                   "en-GB-SoniaNeural"],
+        "voices": ["en-US-AndrewMultilingualNeural", "en-US-BrianMultilingualNeural",
+                   "en-US-EmmaMultilingualNeural"],
         "music_kw": ["ambient", "cinematic", "lofi", "documentary", "underscore"],
         "bg_kw": ["stadium", "pitch", "tactics", "city", "drone", "aerial"],
     },
@@ -43,7 +43,8 @@ MOODS: dict[str, dict] = {
         "label": "Drama",
         "tone": "Cinematic, emotional storytelling: weighty, dramatic cadence that "
                 "makes a moment feel legendary.",
-        "voices": ["en-US-GuyNeural", "en-AU-WilliamNeural", "en-US-EricNeural"],
+        "voices": ["en-US-AndrewMultilingualNeural", "en-AU-WilliamMultilingualNeural",
+                   "en-US-BrianMultilingualNeural"],
         "music_kw": ["cinematic", "epic", "emotional", "orchestral", "dramatic"],
         "bg_kw": ["stadium", "trophy", "slowmo", "cinematic", "fans", "tears"],
     },

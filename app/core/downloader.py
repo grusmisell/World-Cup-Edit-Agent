@@ -40,11 +40,47 @@ def download_from_url(url: str, out_dir: Path) -> tuple[Path, str]:
     return video, title
 
 
+_GOOD_KW = ("goals", "skills", "highlights", "best", "magic", "dribbl", "assist", "edit")
+_BAD_KW = ("reaction", "react", "interview", "press", "podcast", "talk", "news ", "fifa 2", "efootball", "pes 2", "gameplay")
+
+
+def _pick_video(query: str) -> dict | None:
+    """Flat-search YouTube and score results to pick a real highlight clip — prefer
+    goals/skills/highlights titles and a sane duration, avoid reactions/gameplay/Shorts."""
+    import yt_dlp
+
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True}) as y:
+            info = y.extract_info(f"ytsearch6:{query}", download=False)
+    except Exception:
+        return None
+    entries = [e for e in (info.get("entries") or []) if e and e.get("id")]
+    if not entries:
+        return None
+
+    def score(e: dict) -> int:
+        title = (e.get("title") or "").lower()
+        dur = e.get("duration") or 0
+        s = 0
+        s += 2 * sum(kw in title for kw in _GOOD_KW)
+        s -= 3 * sum(kw in title for kw in _BAD_KW)
+        if 45 <= dur <= 1200:
+            s += 3
+        elif dur and dur < 25:      # likely a Short / intro card
+            s -= 4
+        elif dur and dur > 2400:    # very long comp — section may miss the action
+            s -= 1
+        return s
+
+    entries.sort(key=score, reverse=True)
+    return entries[0]
+
+
 def download_clip(
-    query: str, out_dir: Path, name: str, *, start: float = 12.0, length: float = 12.0,
+    query: str, out_dir: Path, name: str, *, length: float = 12.0,
 ) -> Path | None:
-    """Search YouTube for `query` and download just a ~`length`s section (starting
-    at `start`s, to skip intros) as out_dir/<name>.mp4. Uses yt-dlp's partial
+    """Search YouTube for `query`, pick a good highlight video, and download just a
+    ~`length`s section (past the intro) as out_dir/<name>.mp4. Uses yt-dlp's partial
     download (needs ffmpeg ON PATH, so we add it). Returns the path, or None on
     failure — callers should handle a missing clip gracefully."""
     import os
@@ -54,6 +90,16 @@ def download_clip(
     # yt-dlp's range downloader (FFmpegFD) looks for ffmpeg on PATH, not just via
     # ffmpeg_location, so make sure our bundled ffmpeg is discoverable there.
     os.environ["PATH"] = ffmpeg_utils.ffmpeg_dir() + os.pathsep + os.environ.get("PATH", "")
+
+    pick = _pick_video(query)
+    if pick:
+        dur = pick.get("duration") or 0
+        # Start a bit in to skip intros/title cards; stay clear of the very end.
+        start = min(max(12.0, dur * 0.12), max(12.0, dur - length - 2)) if dur else 15.0
+        target = f"https://www.youtube.com/watch?v={pick['id']}"
+    else:
+        start, target = 15.0, f"ytsearch1:{query}"
+
     outtmpl = str(out_dir / f"{name}.%(ext)s")
     opts = {
         "format": "best[height<=720][ext=mp4]/best[height<=720]/best[ext=mp4]/best",
@@ -64,7 +110,6 @@ def download_clip(
         "download_ranges": yt_dlp.utils.download_range_func(None, [(start, start + length)]),
         "force_keyframes_at_cuts": True,
     }
-    target = query if query.startswith("ytsearch") else f"ytsearch1:{query}"
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.extract_info(target, download=True)

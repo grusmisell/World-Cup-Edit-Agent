@@ -13,6 +13,12 @@ from .analyzer import _extract_json, _clean_tags
 
 # Free Microsoft neural voices (no API key) — friendly label per voice id.
 VOICES = {
+    # Most natural ("Multilingual" models) — listed first, used by default.
+    "en-US-AndrewMultilingualNeural": "Andrew (natural) — US, warm male",
+    "en-US-BrianMultilingualNeural": "Brian (natural) — US, casual male",
+    "en-US-AvaMultilingualNeural": "Ava (natural) — US, female",
+    "en-US-EmmaMultilingualNeural": "Emma (natural) — US, female",
+    "en-AU-WilliamMultilingualNeural": "William (natural) — AU, male",
     # US — male
     "en-US-AndrewNeural": "Andrew — US, warm male",
     "en-US-BrianNeural": "Brian — US, casual male",
@@ -178,8 +184,11 @@ def generate_topics(
     return out[:count]
 
 
-def synthesize(text: str, out_path: Path, *, voice: str = DEFAULT_VOICE) -> Path:
-    """Render `text` to an mp3 voiceover with edge-tts (free neural voices)."""
+def synthesize(
+    text: str, out_path: Path, *, voice: str = DEFAULT_VOICE, rate: str = "+0%",
+) -> Path:
+    """Render `text` to an mp3 voiceover with edge-tts (free neural voices). `rate`
+    is an edge-tts speed string like '-5%' / '+8%' for subtle pacing."""
     import asyncio
     import edge_tts
 
@@ -188,7 +197,7 @@ def synthesize(text: str, out_path: Path, *, voice: str = DEFAULT_VOICE) -> Path
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     async def _go():
-        await edge_tts.Communicate(text, voice).save(str(out_path))
+        await edge_tts.Communicate(text, voice, rate=rate).save(str(out_path))
 
     asyncio.run(_go())
     return out_path

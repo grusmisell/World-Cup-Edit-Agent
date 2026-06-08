@@ -495,7 +495,8 @@ def _run_countdown(job: Job, work_dir: Path, clips_dir: Path) -> None:
             ap = voiceover.synthesize(text, work_dir / f"seg_{si:02d}.mp3", voice=voice)
             tr = transcriber.transcribe(ap, tr_dir, model_size=settings.whisper_model)
             d = max(0.6, ffmpeg_utils.probe_duration(ap))
-            for w in tr.words:
+            # Use the KNOWN script spelling on whisper's timings (correct names).
+            for w in transcriber.align_words(text, tr.words):
                 all_words.append(transcriber.Word(w.text, w.start + cursor, w.end + cursor))
             seg_audio.append(ap)
             segments.append({"start": round(cursor, 3), "end": round(cursor + d, 3),
@@ -528,7 +529,7 @@ def _run_countdown(job: Job, work_dir: Path, clips_dir: Path) -> None:
         job.set_stage("clipping", "Compositing the countdown...")
         clipper.render_countdown(
             segments, voice_path, clips_dir / filename, words=all_words,
-            title=script.title, music=music, music_volume=settings.music_volume,
+            title=script.title, music=music, music_volume=0.42,
         )
     else:
         # Auto-pull a real ~12s clip per ranked item from YouTube.
@@ -556,7 +557,7 @@ def _run_countdown(job: Job, work_dir: Path, clips_dir: Path) -> None:
         job.set_stage("clipping", "Compositing the montage...")
         clipper.render_montage(
             segments, voice_path, clips_dir / filename, words=all_words,
-            title=script.title, music=music, music_volume=settings.music_volume,
+            title=script.title, music=music, music_volume=0.42,
         )
         import shutil as _sh2
         _sh2.rmtree(src_dir, ignore_errors=True)

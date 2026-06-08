@@ -189,6 +189,49 @@ def _parse_whisper_json(data: dict, *, progress=None) -> Transcript:
     return Transcript(language=language, segments=segments)
 
 
+def align_words(script_text: str, words: list[Word]) -> list[Word]:
+    """When we KNOW the exact narration (e.g. a generated script), transfer the
+    correct spelling onto whisper's word TIMINGS — so captions read 'Mbappe' not
+    'Killian'. Aligns the script tokens to the (mis-spelled) whisper tokens with
+    difflib; equal runs keep their timing 1:1, replaced runs distribute evenly.
+    Falls back to the raw whisper words if anything looks off."""
+    import difflib
+    import re
+
+    script_toks = (script_text or "").split()
+    if not words or not script_toks:
+        return words
+
+    def norm(s: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", s.lower())
+
+    w_norm = [norm(w.text) for w in words]
+    s_norm = [norm(t) for t in script_toks]
+    out: list[Word] = []
+    sm = difflib.SequenceMatcher(a=w_norm, b=s_norm, autojunk=False)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal":
+            for k in range(i2 - i1):
+                out.append(Word(script_toks[j1 + k], words[i1 + k].start, words[i1 + k].end))
+        elif tag == "replace":
+            wseg, sseg = words[i1:i2], script_toks[j1:j2]
+            if not wseg or not sseg:
+                continue
+            start, end = wseg[0].start, wseg[-1].end
+            span = max(0.04, (end - start) / len(sseg))
+            for k, t in enumerate(sseg):
+                out.append(Word(t, start + k * span, start + (k + 1) * span))
+        elif tag == "insert":
+            sseg = script_toks[j1:j2]
+            anchor = words[i1].start if i1 < len(words) else (words[-1].end if words else 0.0)
+            prev = out[-1].end if out else anchor
+            span = max(0.05, (anchor - prev) / max(1, len(sseg)))
+            for k, t in enumerate(sseg):
+                out.append(Word(t, prev + k * span, prev + (k + 1) * span))
+        # 'delete': whisper had extra tokens not in the script — drop them.
+    return out or words
+
+
 def load_transcript(out_dir: Path) -> Transcript | None:
     """Rebuild a Transcript from a previously-saved whisper_out.json (no re-run)."""
     json_path = out_dir / "whisper_out.json"
