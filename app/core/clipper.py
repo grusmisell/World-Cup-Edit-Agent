@@ -398,6 +398,7 @@ def render_football_edit(
     zoom_punch: float = 0.07,
     grid: "beats_mod.BeatGrid | None" = None,
     has_audio: bool = True,
+    bpm: int = 0,
 ) -> Path:
     """Render a highlight segment [start, end] as a beat-synced football edit:
     9:16 reframe -> cinematic grade -> tempo-synced zoom punch -> bold name/title
@@ -408,13 +409,17 @@ def render_football_edit(
     duration = max(0.5, end - start)
     music_path = Path(music).resolve() if music else None
 
-    # Beat grid from the music (preferred) or the clip's own audio, for the pulse.
+    # Beat grid: an explicit BPM (for an in-app song) wins; else detect from the
+    # music (preferred) or the clip's own audio.
     if grid is None and zoom_punch > 0:
-        ref = music_path if (music_path and music_path.exists()) else source
-        try:
-            grid = beats_mod.detect(ref, max_seconds=duration + 4)
-        except Exception:
-            grid = None
+        if bpm and bpm > 0:
+            grid = beats_mod.BeatGrid(onsets=[], period=60.0 / max(40, min(220, bpm)), bpm=bpm)
+        else:
+            ref = music_path if (music_path and music_path.exists()) else source
+            try:
+                grid = beats_mod.detect(ref, max_seconds=duration + 4)
+            except Exception:
+                grid = None
 
     ass_path = out_dir / f"{out_path.stem}.ass"
     build_edit_ass(

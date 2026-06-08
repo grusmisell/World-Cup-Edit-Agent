@@ -656,7 +656,7 @@ def _run_pipeline(job: Job, local_path: Path | None) -> None:
                 model=settings.claude_model,
             )
 
-        music_path = _resolve_music(job)
+        music_path = None if job.no_music else _resolve_music(job)
         bg_path = None
         if job.background and job.edit_style != "football_edit":
             cand = BACKGROUNDS_DIR / job.background
@@ -677,7 +677,7 @@ def _run_pipeline(job: Job, local_path: Path | None) -> None:
                     src_w=src_w, src_h=src_h, reframe=job.reframe,
                     name_tag=plan.name_tag, title=plan.title,
                     music=music_path, music_volume=settings.edit_music_volume,
-                    zoom_punch=settings.edit_zoom_punch, has_audio=True,
+                    zoom_punch=settings.edit_zoom_punch, has_audio=True, bpm=job.bpm,
                 )
             else:
                 clipper.render_clip(

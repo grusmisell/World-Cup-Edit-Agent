@@ -341,7 +341,7 @@ async def create_job(
             source_type="file", source=file.filename, clip_count=clip_count,
             burn_captions=burn_captions, aspect=aspect, reframe=reframe,
             edit_style=edit_style, caption_style=caption_style, background=background,
-            music=music, niche=niche, trend_match=trend_match,
+            music=music, no_music=no_music, bpm=bpm, niche=niche, trend_match=trend_match,
             gen_captions=gen_captions, min_seconds=min_seconds, max_seconds=max_seconds,
             local_path=dest,
         )
@@ -353,7 +353,7 @@ async def create_job(
             source_type="url", source=url, clip_count=clip_count,
             burn_captions=burn_captions, aspect=aspect, reframe=reframe,
             edit_style=edit_style, caption_style=caption_style, background=background,
-            music=music, niche=niche, trend_match=trend_match,
+            music=music, no_music=no_music, bpm=bpm, niche=niche, trend_match=trend_match,
             gen_captions=gen_captions, min_seconds=min_seconds, max_seconds=max_seconds,
         )
     else:

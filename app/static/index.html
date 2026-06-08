@@ -64,6 +64,9 @@
               </div>
             </label>
           </div>
+          <label class="text-xs text-slate-400 block">Beat-sync BPM (0 = off) — set to a song's tempo, pick Music = "None", add the song in-app
+            <input name="bpm_hl" type="number" min="0" max="220" value="0" class="mt-1 w-32 bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
+          </label>
         </div>
 
         <!-- news -->
@@ -248,6 +251,7 @@ $("#form").onsubmit = async (e) => {
     fd.append("clip_count", f.clip_count.value);
     fd.append("min_seconds", f.min_seconds.value);
     fd.append("max_seconds", f.max_seconds.value);
+    fd.append("bpm", f.bpm_hl.value||"0");
   } else if(MODE==="news"){
     fd.append("topic", f.topic_news.value||"");
     fd.append("clip_count", f.clip_count_news.value||"3");
