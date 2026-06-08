@@ -94,13 +94,15 @@
 
         <!-- countdown -->
         <div data-for="countdown" class="space-y-3 hidden">
-          <p class="text-sm text-slate-300">Makaloozas-style ranked countdown: an AI voiceover ranks the top N (web-searched) with name-cards, gold rank badges & glowing captions over your player photos.</p>
+          <p class="text-sm text-slate-300">Makaloozas-style ranked countdown: an AI voiceover ranks the top N (web-searched), and it <b>auto-pulls a real clip of each player/team from YouTube</b> — with name-cards, gold rank badges & glowing captions over real footage.</p>
           <input name="topic_cd" type="text" placeholder="Top 5 national teams to win the 2026 World Cup" class="w-full bg-slate-900/70 rounded-lg px-3 py-2 text-sm border border-white/10" />
           <label class="text-xs text-slate-400 block">How many (top N)
             <input name="count_cd" type="number" min="3" max="10" value="5" class="mt-1 w-32 bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
           </label>
-          <input name="images_cd" type="file" accept="image/*" multiple class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-600 file:text-white" />
-          <p class="text-[11px] text-slate-500">Upload one photo per rank, <b>in countdown order</b>: first image = #N (shown first) … last image = #1 (the winner).</p>
+          <details class="text-xs text-slate-400"><summary class="cursor-pointer">Optional: use my own photos/clips instead of auto-pull</summary>
+            <input name="images_cd" type="file" accept="image/*" multiple class="mt-2 w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-600 file:text-white" />
+            <p class="text-[11px] text-slate-500 mt-1">If you upload, use one photo per rank <b>in countdown order</b> (first = #N, last = #1).</p>
+          </details>
         </div>
 
         <!-- imageedit -->
@@ -237,7 +239,7 @@ $("#form").onsubmit = async (e) => {
     fd.append("topic", f.topic_cd.value||"");
     fd.append("clip_count", f.count_cd.value||"5");
     [...f.images_cd.files].forEach(img => fd.append("images", img));
-    if(!f.images_cd.files.length){ $("#formErr").textContent="Upload player photos (in countdown order)."; return; }
+    if(!f.topic_cd.value.trim()){ $("#formErr").textContent="Enter a countdown topic (e.g. 'Top 5 players')."; return; }
   } else { // imageedit
     [...f.images.files].forEach(img => fd.append("images", img));
     fd.append("title", f.title_img.value||"");

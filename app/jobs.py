@@ -461,11 +461,7 @@ def _run_imageedit(job: Job, work_dir: Path, clips_dir: Path) -> None:
 def _run_countdown(job: Job, work_dir: Path, clips_dir: Path) -> None:
     if not settings.anthropic_api_key:
         raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to your .env file.")
-    imgs = _job_images(job)
-    if not imgs:
-        raise RuntimeError(
-            "Upload player/team images (in countdown order, #N first) for a countdown edit."
-        )
+    imgs = _job_images(job)   # optional — empty means auto-pull real clips per item
     niche = job.niche or football.DEFAULT_NICHE
     n = max(3, min(10, job.clip_count or 5))
     job.set_stage("scripting", f"Writing the top {n} countdown...")
@@ -518,22 +514,52 @@ def _run_countdown(job: Job, work_dir: Path, clips_dir: Path) -> None:
     ffmpeg_utils.run([*a_in, "-filter_complex", concat_f, "-map", "[a]",
                       "-c:a", "libmp3lame", voice_path.name], cwd=work_dir)
 
-    # Assign one image per segment (items in countdown order; intro uses the first).
-    ic = 0
-    for seg in segments:
-        if seg["kind"] == "item":
-            seg["visual"] = str(imgs[ic % len(imgs)])
-            ic += 1
-        else:
-            seg["visual"] = str(imgs[0])
-
     music = _resolve_music(job) or (_all_music()[0] if _all_music() else None)
-    job.set_stage("clipping", "Compositing the countdown...")
     filename = "clip_01.mp4"
-    clipper.render_countdown(
-        segments, voice_path, clips_dir / filename, words=all_words,
-        title=script.title, music=music, music_volume=settings.music_volume,
-    )
+    if imgs:
+        # Image montage (uploaded photos in countdown order; intro uses the first).
+        ic = 0
+        for seg in segments:
+            if seg["kind"] == "item":
+                seg["visual"] = str(imgs[ic % len(imgs)])
+                ic += 1
+            else:
+                seg["visual"] = str(imgs[0])
+        job.set_stage("clipping", "Compositing the countdown...")
+        clipper.render_countdown(
+            segments, voice_path, clips_dir / filename, words=all_words,
+            title=script.title, music=music, music_volume=settings.music_volume,
+        )
+    else:
+        # Auto-pull a real ~12s clip per ranked item from YouTube.
+        src_dir = work_dir / "src"
+        src_dir.mkdir(parents=True, exist_ok=True)
+        item_clips: dict[int, Path | None] = {}
+        for j, it in enumerate(items):
+            job.set_stage("downloading", f"Finding footage {j + 1}/{len(items)}: {it['name']}...")
+            job.progress = 0.72 + 0.18 * (j / max(1, len(items)))
+            job.save()
+            item_clips[it["rank"]] = downloader.download_clip(
+                it.get("query") or f"{it['name']} football skills goals",
+                src_dir, f"item_{it['rank']}",
+            )
+        first_clip = next((p for p in item_clips.values() if p), None)
+        if not first_clip:
+            raise RuntimeError(
+                "Couldn't fetch any footage from YouTube. Try again, or upload images instead."
+            )
+        for seg in segments:
+            if seg["kind"] == "item":
+                seg["visual"] = str(item_clips.get(seg["rank"]) or first_clip)
+            else:
+                seg["visual"] = str(first_clip)
+        job.set_stage("clipping", "Compositing the montage...")
+        clipper.render_montage(
+            segments, voice_path, clips_dir / filename, words=all_words,
+            title=script.title, music=music, music_volume=settings.music_volume,
+        )
+        import shutil as _sh2
+        _sh2.rmtree(src_dir, ignore_errors=True)
     dur = ffmpeg_utils.probe_duration(clips_dir / filename)
     tags = ["worldcup2026", "football", f"top{n}", "ranking", "fyp"]
     job.clips.append(ClipResult(

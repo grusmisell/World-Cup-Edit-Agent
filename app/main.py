@@ -292,8 +292,7 @@ async def create_job(
             with dest.open("wb") as out:
                 shutil.copyfileobj(up.file, out)
             names.append(dest.name)
-        if not names and not _list_images():
-            raise HTTPException(400, "Upload player/team images (in countdown order) for a countdown.")
+        # No images is fine — countdown auto-pulls a real clip per item from YouTube.
         job = jobs_mod.create_job(
             source_type="countdown",
             source=(topic or niche),

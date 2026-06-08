@@ -572,3 +572,63 @@ def render_countdown(
              "-t", f"{total:.3f}", *_ENCODE, out_path.name]
     ffmpeg_utils.run(args, cwd=out_dir)
     return out_path
+
+
+def render_montage(
+    segments: list[dict],
+    voice: Path,
+    out_path: Path,
+    *,
+    words: list[Word],
+    title: str = "",
+    music: str | Path | None = None,
+    music_volume: float = 0.28,
+) -> Path:
+    """Like render_countdown, but each segment's visual is a real VIDEO clip
+    (auto-pulled player footage) instead of a still: trim each clip to its
+    narration window, 9:16 crop, clean grade, glowing captions, name-cards +
+    #rank badges, voiceover + ducked music. Returns out_path."""
+    out_dir = out_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    voice = Path(voice).resolve()
+    total = round(max(s["end"] for s in segments), 3)
+
+    inputs: list[str] = []
+    segf: list[str] = []
+    for i, seg in enumerate(segments):
+        vis = Path(seg["visual"]).resolve()
+        d = max(0.6, seg["end"] - seg["start"])
+        inputs += ["-i", str(vis)]
+        segf.append(
+            f"[{i}:v]trim=duration={d:.3f},setpts=PTS-STARTPTS,fps={FPS},"
+            f"scale={EDIT_W}:{EDIT_H}:force_original_aspect_ratio=increase,"
+            f"crop={EDIT_W}:{EDIT_H},setsar=1[v{i}]"
+        )
+    concat_in = "".join(f"[v{i}]" for i in range(len(segments)))
+    graph = ";".join(segf) + f";{concat_in}concat=n={len(segments)}:v=1:a=0,{_GRADE}"
+
+    ass = out_dir / f"{out_path.stem}.ass"
+    build_countdown_ass(ass, words=words, segments=segments, title=title,
+                        play_w=EDIT_W, play_h=EDIT_H)
+    graph += f",ass={ass.name}[outv]"
+
+    n = len(segments)
+    args = list(inputs) + ["-i", str(voice)]
+    voice_idx = n
+    music_path = Path(music).resolve() if music else None
+    if music_path and music_path.exists():
+        args += ["-stream_loop", "-1", "-i", str(music_path)]
+        vol = max(0.0, min(1.0, music_volume))
+        graph += (
+            f";[{n + 1}:a]volume={vol:.2f}[mq];"
+            f"[mq][{voice_idx}:a]sidechaincompress=threshold=0.05:ratio=6:attack=20:release=400[md];"
+            f"[{voice_idx}:a][md]amix=inputs=2:duration=first:normalize=0[aout]"
+        )
+        amap = "[aout]"
+    else:
+        amap = f"{voice_idx}:a"
+
+    args += ["-filter_complex", graph, "-map", "[outv]", "-map", amap,
+             "-t", f"{total:.3f}", *_ENCODE, out_path.name]
+    ffmpeg_utils.run(args, cwd=out_dir)
+    return out_path

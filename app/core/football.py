@@ -204,7 +204,9 @@ def countdown_script(
         f"is ~45 seconds.\n\n"
         f'Return ONLY JSON: {{"title": "<max 60 chars>", "intro": "<1-sentence hook>", '
         f'"items": [{{"rank": <int>, "name": "<team or player>", '
-        f'"tag": "<2-18 char on-screen label>", "blurb": "<why it ranks here>"}}]}} '
+        f'"tag": "<2-18 char on-screen label>", "blurb": "<why it ranks here>", '
+        f'"query": "<a YouTube search to find a short skills/goals highlight clip of '
+        f'this player or team, e.g. \'Kylian Mbappe goals skills\'>"}}]}} '
         f"with items ordered rank {count} first down to rank 1 last. No text outside the JSON."
     )
     tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 4}] if web_search else []
@@ -227,6 +229,7 @@ def countdown_script(
             "rank": rank, "name": name,
             "tag": (str(it.get("tag") or name).strip()[:18]).upper(),
             "blurb": str(it.get("blurb", "")).strip()[:300],
+            "query": str(it.get("query") or f"{name} football skills goals").strip()[:120],
         })
     items.sort(key=lambda x: -x["rank"])   # countdown: high rank first
     if not items:
