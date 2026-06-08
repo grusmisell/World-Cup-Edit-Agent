@@ -12,11 +12,20 @@ import urllib.request
 import urllib.parse
 import json
 import shutil
+import ssl
 from pathlib import Path
 
 from ..config import settings, BACKGROUNDS_DIR
 
 API = "https://api.pexels.com/videos/search"
+
+# Validate TLS against certifi's CA bundle (the system store can be stale and
+# reject Pexels' cert as "expired"). certifi ships with anthropic/httpx.
+try:
+    import certifi
+    _SSL_CTX: ssl.SSLContext | None = ssl.create_default_context(cafile=certifi.where())
+except Exception:  # pragma: no cover
+    _SSL_CTX = None
 
 # Pexels (Cloudflare) 403s the default "Python-urllib" UA, so send a real one.
 _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ClippingAgent/1.0"
@@ -62,7 +71,7 @@ def search(query: str, *, per_page: int = 15) -> list[dict]:
         f"{API}?{params}", headers={"Authorization": key, "User-Agent": _UA}
     )
     try:
-        with urllib.request.urlopen(req, timeout=30) as r:
+        with urllib.request.urlopen(req, timeout=30, context=_SSL_CTX) as r:
             data = json.loads(r.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:  # noqa: PERF203
         raise PexelsError(f"Pexels API error {exc.code}: {exc.reason}") from exc
@@ -98,7 +107,7 @@ def download_one(query: str, dest_name: str, *, skip_ids: set[int] | None = None
             continue
         dest = BACKGROUNDS_DIR / f"{dest_name}.mp4"
         dreq = urllib.request.Request(f["link"], headers={"User-Agent": _UA})
-        with urllib.request.urlopen(dreq, timeout=120) as resp, open(dest, "wb") as out:
+        with urllib.request.urlopen(dreq, timeout=120, context=_SSL_CTX) as resp, open(dest, "wb") as out:
             shutil.copyfileobj(resp, out)
         skip_ids.add(video.get("id"))
         return dest
