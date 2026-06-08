@@ -201,6 +201,7 @@ async def create_job(
     voice: str = Form(default=""),
     mood: str = Form(default=""),
     news_seconds: int = Form(default=30),
+    custom_script: str = Form(default=""),
     title: str = Form(default=""),
     file: UploadFile | None = File(default=None),
     images: list[UploadFile] = File(default=[]),
@@ -248,6 +249,7 @@ async def create_job(
             voice=voice,
             mood=mood,
             news_seconds=max(12, min(90, int(news_seconds))),
+            custom_script=(custom_script or "").strip()[:12000],
         )
         return JSONResponse({"id": job.id})
 

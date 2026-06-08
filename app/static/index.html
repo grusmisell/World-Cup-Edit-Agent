@@ -69,6 +69,8 @@
         <div data-for="news" class="space-y-3 hidden">
           <p class="text-sm text-slate-300">Enter players / countries / storylines (one per line). Claude web-searches the latest news and makes an AI-voiced edit over football B-roll. Leave blank to auto-pick what's trending.</p>
           <textarea name="topic_news" rows="4" placeholder="Kylian Mbappe&#10;USA World Cup squad&#10;Argentina" class="w-full bg-slate-900/70 rounded-lg px-3 py-2 text-sm border border-white/10"></textarea>
+          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer"><input type="checkbox" id="useScript"> ✍️ Use my own script(s) — skip web search, post verbatim</label>
+          <textarea name="custom_script" id="customScript" rows="6" placeholder="Paste a finished script here. For a batch, separate multiple scripts with a line containing only:&#10;---" class="hidden w-full bg-slate-900/70 rounded-lg px-3 py-2 text-sm border border-white/10"></textarea>
           <div class="grid grid-cols-2 gap-3">
             <label class="text-xs text-slate-400">How many news edits
               <input name="clip_count_news" type="number" min="1" max="20" value="3" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
@@ -158,6 +160,7 @@ function setMode(m){
   $("#fetchBroll").classList.toggle("hidden", !(m==="news"));
 }
 $$(".modebtn").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+$("#useScript").onchange = () => $("#customScript").classList.toggle("hidden", !$("#useScript").checked);
 
 async function jget(u){ const r = await fetch(u); return r.ok ? r.json() : null; }
 
@@ -215,6 +218,9 @@ $("#form").onsubmit = async (e) => {
     fd.append("news_seconds", f.news_seconds.value||"28");
     fd.append("mood", f.mood.value||"");
     fd.append("voice", f.voice.value||"");
+    if($("#useScript").checked && f.custom_script.value.trim()){
+      fd.append("custom_script", f.custom_script.value);
+    }
   } else { // imageedit
     [...f.images.files].forEach(img => fd.append("images", img));
     fd.append("title", f.title_img.value||"");

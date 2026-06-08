@@ -131,6 +131,48 @@ def news_script(
     )
 
 
+def script_to_news(
+    text: str,
+    *,
+    api_key: str,
+    model: str,
+    niche: str = DEFAULT_NICHE,
+) -> NewsScript:
+    """Wrap a user-supplied finished script as a NewsScript, deriving post metadata
+    (title / on-screen name tag / hashtags) with one cheap Claude call (NO web
+    search — the script is taken as-is). Robust: falls back to sensible defaults if
+    the metadata call fails, so the script always renders."""
+    text = (text or "").strip()
+    if not text:
+        raise RuntimeError("Empty custom script.")
+    prompt = (
+        f"Here is a finished short-form football voiceover script for a {niche} "
+        f"channel. Do NOT rewrite it — just write post metadata for it.\n\n"
+        f"SCRIPT:\n{text}\n\n"
+        f'Return ONLY JSON: {{"title": "<punchy title, max 60 chars>", '
+        f'"name_tag": "<2-18 char on-screen label, e.g. a surname or country>", '
+        f'"hashtags": ["<4-6 hashtags, no # symbol, lowercase, no spaces>"]}}. '
+        f"No text outside the JSON."
+    )
+    data: dict = {}
+    try:
+        resp = _client(api_key).messages.create(
+            model=model, max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = "".join(b.text for b in resp.content if b.type == "text")
+        data = _extract_json(raw)
+    except Exception:
+        data = {}
+    title = str(data.get("title") or text[:48]).strip()[:80]
+    name_tag = str(data.get("name_tag") or "").strip()[:18]
+    hashtags = _clean_tags(data.get("hashtags")) or ["worldcup2026", "football", "soccer", "fyp"]
+    return NewsScript(
+        title=title, text=text, hashtags=hashtags,
+        subject=title, name_tag=name_tag, sources=[],
+    )
+
+
 def trending_subjects(
     count: int,
     *,

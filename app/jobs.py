@@ -11,6 +11,7 @@ Modes (source_type):
 from __future__ import annotations
 
 import json
+import re
 import threading
 import traceback
 import uuid
@@ -85,6 +86,7 @@ class Job:
     voice: str = ""
     mood: str = ""            # "" = auto-mix, "manual", or a football.MOODS key
     news_seconds: int = 30    # news mode: target narration length per edit
+    custom_script: str = ""   # news mode: user's own script(s), split on a '---' line
     images: list[str] = field(default_factory=list)  # imageedit mode: filenames
     trend_match: bool = False
     trends: list[dict] = field(default_factory=list)
@@ -181,6 +183,7 @@ def create_job(
     voice: str = "",
     mood: str = "",
     news_seconds: int = 30,
+    custom_script: str = "",
     images: list[str] | None = None,
     local_path: Path | None = None,
 ) -> Job:
@@ -206,6 +209,7 @@ def create_job(
         voice=voice,
         mood=mood,
         news_seconds=news_seconds,
+        custom_script=custom_script,
         images=images or [],
     )
     with _lock:
@@ -295,13 +299,22 @@ def _run_news(job: Job, work_dir: Path, clips_dir: Path) -> None:
     manual_bgs = _manual_backgrounds(job)
     all_music = _all_music()
     manual_music = _resolve_music(job)
-    n = max(1, min(20, job.clip_count))
-    subjects = _news_subjects(job, niche, n)
-    total = len(subjects)
+
+    # Custom scripts (split on a line that is just '---') take priority over
+    # web-searched subjects. Each chunk becomes one edit, posted verbatim.
+    custom_chunks: list[str] = []
+    if job.custom_script.strip():
+        custom_chunks = [c.strip() for c in re.split(r"(?m)^\s*-{3,}\s*$", job.custom_script) if c.strip()]
+    if custom_chunks:
+        items = custom_chunks[:20]
+    else:
+        n = max(1, min(20, job.clip_count))
+        items = _news_subjects(job, niche, n)
+    total = len(items)
     counters: dict[str, int] = {}
     voice_counters: dict[str, int] = {}
 
-    for i, subject in enumerate(subjects):
+    for i, item in enumerate(items):
         mood = _mood_for_index(job, i)
         if mood:
             cfg = football.MOODS[mood]
@@ -319,14 +332,22 @@ def _run_news(job: Job, work_dir: Path, clips_dir: Path) -> None:
             background = manual_bgs[i % len(manual_bgs)]
             mood_label = "manual"
 
-        job.set_stage("scripting", f"Story {i + 1}/{total} ({mood_label}): pulling latest news...")
         job.progress = 0.10 + 0.85 * (i / total)
-        job.save()
-        script = football.news_script(
-            subject, api_key=settings.anthropic_api_key,
-            model=settings.claude_model, niche=niche, tone=tone,
-            seconds=max(12, min(90, job.news_seconds or 30)),
-        )
+        if custom_chunks:
+            job.set_stage("scripting", f"Edit {i + 1}/{total} ({mood_label}): preparing your script...")
+            job.save()
+            script = football.script_to_news(
+                item, api_key=settings.anthropic_api_key,
+                model=settings.claude_model, niche=niche,
+            )
+        else:
+            job.set_stage("scripting", f"Story {i + 1}/{total} ({mood_label}): pulling latest news...")
+            job.save()
+            script = football.news_script(
+                item, api_key=settings.anthropic_api_key,
+                model=settings.claude_model, niche=niche, tone=tone,
+                seconds=max(12, min(90, job.news_seconds or 30)),
+            )
 
         voice_name = voiceover.VOICES.get(voice, voice).split(" — ")[0]
         job.set_stage("voicing", f"Story {i + 1}/{total}: voicing ({voice_name})...")
