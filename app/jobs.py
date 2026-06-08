@@ -84,6 +84,7 @@ class Job:
     topic: str = ""           # news mode: subject(s), one per line
     voice: str = ""
     mood: str = ""            # "" = auto-mix, "manual", or a football.MOODS key
+    news_seconds: int = 30    # news mode: target narration length per edit
     images: list[str] = field(default_factory=list)  # imageedit mode: filenames
     trend_match: bool = False
     trends: list[dict] = field(default_factory=list)
@@ -179,6 +180,7 @@ def create_job(
     topic: str = "",
     voice: str = "",
     mood: str = "",
+    news_seconds: int = 30,
     images: list[str] | None = None,
     local_path: Path | None = None,
 ) -> Job:
@@ -203,6 +205,7 @@ def create_job(
         topic=topic,
         voice=voice,
         mood=mood,
+        news_seconds=news_seconds,
         images=images or [],
     )
     with _lock:
@@ -322,6 +325,7 @@ def _run_news(job: Job, work_dir: Path, clips_dir: Path) -> None:
         script = football.news_script(
             subject, api_key=settings.anthropic_api_key,
             model=settings.claude_model, niche=niche, tone=tone,
+            seconds=max(12, min(90, job.news_seconds or 30)),
         )
 
         voice_name = voiceover.VOICES.get(voice, voice).split(" — ")[0]

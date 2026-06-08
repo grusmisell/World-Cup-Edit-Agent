@@ -200,6 +200,7 @@ async def create_job(
     topic: str = Form(default=""),
     voice: str = Form(default=""),
     mood: str = Form(default=""),
+    news_seconds: int = Form(default=30),
     title: str = Form(default=""),
     file: UploadFile | None = File(default=None),
     images: list[UploadFile] = File(default=[]),
@@ -246,6 +247,7 @@ async def create_job(
             topic=(topic or "").strip()[:2000],
             voice=voice,
             mood=mood,
+            news_seconds=max(12, min(90, int(news_seconds))),
         )
         return JSONResponse({"id": job.id})
 

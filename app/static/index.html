@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>World Cup Edit Agent ⚽</title>
+  <title>Far Post ⚽ — World Cup edits</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background: radial-gradient(1200px 600px at 50% -10%, #15324a 0%, #0b1220 55%, #070b14 100%); }
@@ -17,8 +17,8 @@
   <div class="max-w-6xl mx-auto px-4 py-8">
     <header class="mb-6 flex items-center justify-between flex-wrap gap-3">
       <div>
-        <h1 class="text-3xl font-black tracking-tight">⚽ World Cup Edit Agent</h1>
-        <p class="text-slate-400 text-sm mt-1">Beat-synced highlight edits · AI news edits · photo edits — for TikTok / Reels / Shorts</p>
+        <h1 class="text-3xl font-black tracking-tight">⚽ Far Post</h1>
+        <p class="text-slate-400 text-sm mt-1">Beat-synced highlight edits · AI news edits · photo edits — World Cup 2026</p>
       </div>
       <div id="health" class="text-xs text-slate-400 text-right leading-5"></div>
     </header>
@@ -69,9 +69,14 @@
         <div data-for="news" class="space-y-3 hidden">
           <p class="text-sm text-slate-300">Enter players / countries / storylines (one per line). Claude web-searches the latest news and makes an AI-voiced edit over football B-roll. Leave blank to auto-pick what's trending.</p>
           <textarea name="topic_news" rows="4" placeholder="Kylian Mbappe&#10;USA World Cup squad&#10;Argentina" class="w-full bg-slate-900/70 rounded-lg px-3 py-2 text-sm border border-white/10"></textarea>
-          <label class="text-xs text-slate-400">How many news edits
-            <input name="clip_count_news" type="number" min="1" max="20" value="3" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
-          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="text-xs text-slate-400">How many news edits
+              <input name="clip_count_news" type="number" min="1" max="20" value="3" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
+            </label>
+            <label class="text-xs text-slate-400">Edit length (s) — ~25-30 for TikTok
+              <input name="news_seconds" type="number" min="12" max="90" value="28" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10" />
+            </label>
+          </div>
           <div class="grid grid-cols-2 gap-3">
             <label class="text-xs text-slate-400">Mood
               <select name="mood" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10">
@@ -123,6 +128,11 @@
           <div class="h-2 bg-slate-800 rounded-full overflow-hidden"><div id="pBar" class="h-full bg-gradient-to-r from-green-500 to-sky-500 w-0 transition-all"></div></div>
           <p id="pMsg" class="text-xs text-slate-400 mt-2"></p>
         </div>
+        <div id="queueCard" class="card rounded-2xl p-4 border border-white/5 text-sm">
+          <div class="flex items-center justify-between"><h3 class="font-semibold">📦 Weekly queue</h3>
+            <span class="text-xs text-slate-500">cadence: TikTok 3/day · IG 2/day</span></div>
+          <p id="queueText" class="text-slate-300 mt-2 text-xs">Loading…</p>
+        </div>
         <div id="results" class="space-y-4"></div>
         <div class="card rounded-2xl p-4 border border-white/5">
           <div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-sm">Recent jobs</h3><button id="refreshJobs" class="text-xs text-slate-400 hover:text-slate-200">↻</button></div>
@@ -165,6 +175,7 @@ async function boot(){
   if(px?.configured){ $("#fetchBroll").dataset.ok="1"; } else { $("#fetchBroll").textContent="Set PEXELS_API_KEY in .env to fetch B-roll"; $("#fetchBroll").classList.add("pointer-events-none","opacity-60"); }
   YT = !!(yt?.configured);
   loadJobs();
+  loadQueue();
 }
 function fill(sel, items, first){
   if(!sel) return;
@@ -201,6 +212,7 @@ $("#form").onsubmit = async (e) => {
   } else if(MODE==="news"){
     fd.append("topic", f.topic_news.value||"");
     fd.append("clip_count", f.clip_count_news.value||"3");
+    fd.append("news_seconds", f.news_seconds.value||"28");
     fd.append("mood", f.mood.value||"");
     fd.append("voice", f.voice.value||"");
   } else { // imageedit
@@ -265,11 +277,59 @@ function render(j){
         </div>
       </div></div>`;
   }).join("");
-  $("#results").innerHTML = head + cards;
+  const post = `<div class="card rounded-xl p-3 border border-white/5 text-sm">
+    <div class="flex items-center justify-between"><span class="font-semibold">📅 Posting helper</span>
+      <button onclick="markAll('${j.id}',this)" class="text-[11px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded">✓ Mark all posted</button></div>
+    <p class="text-[11px] text-slate-400 mt-1">Exports each clip into dated TikTok/Instagram folders (with captions.txt) so you just open the day's folder and upload.</p>
+    <div class="flex items-center gap-2 mt-2">
+      <label class="text-[11px] flex items-center gap-1"><input type="checkbox" class="pf" value="tiktok" checked> TikTok</label>
+      <label class="text-[11px] flex items-center gap-1"><input type="checkbox" class="pf" value="instagram" checked> Instagram</label>
+      <label class="text-[11px] flex items-center gap-1"><input type="checkbox" class="pf" value="youtube"> YouTube</label>
+      <button onclick="exportFolders('${j.id}',this)" class="ml-auto text-[11px] bg-sky-600 hover:bg-sky-500 px-2 py-1 rounded">📁 Export folders</button>
+    </div>
+    <div id="folders-${j.id}" class="mt-2 space-y-1"></div>
+  </div>`;
+  $("#results").innerHTML = head + cards + post;
   $$(".copycap").forEach(b => b.onclick = () => {
     navigator.clipboard.writeText(b.dataset.cap||"");
     const o=b.textContent; b.textContent="Copied!"; setTimeout(()=>b.textContent=o,1200);
   });
+}
+
+window.exportFolders = async (id, btn) => {
+  const plats = $$(".pf").filter(c=>c.checked).map(c=>c.value);
+  if(!plats.length){ return; }
+  btn.textContent="…";
+  const r = await fetch(`/api/jobs/${id}/export-folders`, {method:"POST", body:new URLSearchParams({platforms:plats.join(",")})});
+  const d = await r.json().catch(()=>null);
+  btn.textContent="📁 Export folders";
+  if(!r.ok||!d){ return; }
+  const box = document.getElementById("folders-"+id);
+  box.innerHTML = `<p class="text-[11px] text-green-400">✓ Exported to <code class="text-slate-300">${escapeHtml(d.path)}</code></p>` +
+    (d.folders||[]).map(f => `<div class="flex items-center justify-between text-[11px] bg-slate-900/60 rounded px-2 py-1">
+      <span>${f.platform} · ${f.date} · ${f.count} clip(s)</span>
+      <button onclick="markFolder('${id}','${f.platform}','${f.date}',this)" class="bg-slate-700 hover:bg-green-600 px-2 py-0.5 rounded">mark posted</button></div>`).join("");
+  loadQueue();
+};
+window.markFolder = async (id, platform, date, btn) => {
+  await fetch(`/api/jobs/${id}/mark-folder-posted`, {method:"POST", body:new URLSearchParams({platform, date})});
+  btn.textContent="✓ marked"; btn.classList.add("bg-green-600"); loadQueue();
+};
+window.markAll = async (id, btn) => {
+  await fetch(`/api/jobs/${id}/mark-all-posted`, {method:"POST", body:new URLSearchParams({platform:"all"})});
+  btn.textContent="✓ all posted"; loadQueue();
+  const j = await jget("/api/jobs/"+id); if(j) render(j);
+};
+async function loadQueue(){
+  const q = await jget("/api/queue-status?days=7&tiktok=3&instagram=2");
+  if(!q){ return; }
+  const tt=q.platforms?.tiktok, ig=q.platforms?.instagram;
+  const gen = q.generate||0;
+  $("#queueText").innerHTML = `You have <b>${q.total}</b> clip(s). `
+    + (tt?`TikTok ${tt.available}/${tt.needed} (~${tt.covered_days}d) · `:"")
+    + (ig?`IG ${ig.available}/${ig.needed} (~${ig.covered_days}d). `:"")
+    + (gen>0?`<span class="text-amber-400">Generate ${gen} more to cover the week.</span>`
+            :`<span class="text-green-400">Week covered ✅</span>`);
 }
 window.togglePosted = async (id, file, plat, btn) => {
   const on = !btn.classList.contains("bg-green-600");
