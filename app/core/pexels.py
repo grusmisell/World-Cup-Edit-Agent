@@ -51,10 +51,12 @@ def _require_key() -> str:
 
 
 def search(query: str, *, per_page: int = 15) -> list[dict]:
-    """Search Pexels for portrait videos. Returns the raw 'videos' list."""
+    """Search Pexels for stock videos. Returns the raw 'videos' list. No
+    orientation filter — football B-roll (stadiums/crowds) is mostly landscape and
+    gets centre-cropped to 9:16 at render, so landscape sources are fine."""
     key = _require_key()
     params = urllib.parse.urlencode(
-        {"query": query, "orientation": "portrait", "size": "medium", "per_page": per_page}
+        {"query": query, "size": "medium", "per_page": per_page}
     )
     req = urllib.request.Request(
         f"{API}?{params}", headers={"Authorization": key, "User-Agent": _UA}
@@ -68,11 +70,12 @@ def search(query: str, *, per_page: int = 15) -> list[dict]:
 
 
 def _best_portrait_file(video: dict) -> dict | None:
-    """Pick the smallest portrait file with height in [MIN_H, MAX_H]; fall back
-    to the largest portrait file under MAX_H, then any portrait file."""
+    """Pick a sensibly-sized file (height in [MIN_H, MAX_H]) regardless of
+    orientation; fall back to the largest under MAX_H, then the smallest available.
+    HD landscape (1920x1080) is ideal — it crops cleanly to a vertical slice."""
     files = [
         f for f in video.get("video_files", [])
-        if f.get("height") and f.get("width") and f["height"] > f["width"] and f.get("link")
+        if f.get("height") and f.get("width") and f.get("link")
     ]
     if not files:
         return None
