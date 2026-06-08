@@ -22,7 +22,20 @@ from pathlib import Path
 from .config import (
     JOBS_DIR, UPLOADS_DIR, BACKGROUNDS_DIR, MUSIC_DIR, IMAGES_DIR, settings,
 )
-from .core import analyzer, clipper, downloader, transcriber, ffmpeg_utils, voiceover, football
+from .core import (
+    analyzer, clipper, downloader, transcriber, ffmpeg_utils, voiceover, football, elevenlabs,
+)
+
+
+def _synthesize(text: str, out_path, edge_voice: str, el_voice: str = ""):
+    """Voice `text` with ElevenLabs when configured (more human), else edge-tts.
+    Falls back to edge-tts on any ElevenLabs error so a job never dies on TTS."""
+    if elevenlabs.is_configured():
+        try:
+            return elevenlabs.synthesize(text, out_path, voice_id=el_voice or None)
+        except Exception:
+            pass
+    return voiceover.synthesize(text, out_path, voice=edge_voice)
 
 # Pipeline stages with rough progress weights (must sum to ~1.0).
 STAGES = [
@@ -84,6 +97,7 @@ class Job:
     niche: str = settings.default_niche
     topic: str = ""           # news mode: subject(s), one per line
     voice: str = ""
+    el_voice: str = ""        # ElevenLabs voice_id override (when EL is configured)
     mood: str = ""            # "" = auto-mix, "manual", or a football.MOODS key
     news_seconds: int = 30    # news mode: target narration length per edit
     custom_script: str = ""   # news mode: user's own script(s), split on a '---' line
@@ -181,6 +195,7 @@ def create_job(
     max_seconds: int = settings.max_clip_seconds,
     topic: str = "",
     voice: str = "",
+    el_voice: str = "",
     mood: str = "",
     news_seconds: int = 30,
     custom_script: str = "",
@@ -207,6 +222,7 @@ def create_job(
         max_clip_seconds=max_seconds,
         topic=topic,
         voice=voice,
+        el_voice=el_voice,
         mood=mood,
         news_seconds=news_seconds,
         custom_script=custom_script,
@@ -351,8 +367,8 @@ def _run_news(job: Job, work_dir: Path, clips_dir: Path) -> None:
 
         voice_name = voiceover.VOICES.get(voice, voice).split(" — ")[0]
         job.set_stage("voicing", f"Story {i + 1}/{total}: voicing ({voice_name})...")
-        audio_path = voiceover.synthesize(
-            script.text, work_dir / f"voice_{i + 1:02d}.mp3", voice=voice
+        audio_path = _synthesize(
+            script.text, work_dir / f"voice_{i + 1:02d}.mp3", voice, job.el_voice
         )
 
         job.set_stage("transcribing", f"Story {i + 1}/{total}: timing captions...")
@@ -492,7 +508,7 @@ def _run_countdown(job: Job, work_dir: Path, clips_dir: Path) -> None:
             job.set_stage("voicing", f"Voicing {si + 1}/{len(seg_specs)}...")
             job.progress = 0.10 + 0.6 * (si / len(seg_specs))
             job.save()
-            ap = voiceover.synthesize(text, work_dir / f"seg_{si:02d}.mp3", voice=voice)
+            ap = _synthesize(text, work_dir / f"seg_{si:02d}.mp3", voice, job.el_voice)
             tr = transcriber.transcribe(ap, tr_dir, model_size=settings.whisper_model)
             d = max(0.6, ffmpeg_utils.probe_duration(ap))
             # Use the KNOWN script spelling on whisper's timings (correct names).

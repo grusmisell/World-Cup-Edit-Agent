@@ -110,6 +110,19 @@ def voices() -> dict:
     return {"voices": VOICES, "default": DEFAULT_VOICE}
 
 
+@app.get("/api/elevenlabs")
+def elevenlabs_info() -> dict:
+    """Whether ElevenLabs is configured, and its available voices (for the picker)."""
+    from .core import elevenlabs
+
+    configured = elevenlabs.is_configured()
+    return {
+        "configured": configured,
+        "voices": elevenlabs.list_voices() if configured else {},
+        "default": settings.elevenlabs_voice_id,
+    }
+
+
 @app.get("/api/queue-status")
 def queue_status(
     days: int = 7,
@@ -199,6 +212,7 @@ async def create_job(
     max_seconds: int = Form(default=settings.max_clip_seconds),
     topic: str = Form(default=""),
     voice: str = Form(default=""),
+    el_voice: str = Form(default=""),
     mood: str = Form(default=""),
     news_seconds: int = Form(default=30),
     custom_script: str = Form(default=""),
@@ -247,6 +261,7 @@ async def create_job(
             niche=niche,
             topic=(topic or "").strip()[:2000],
             voice=voice,
+            el_voice=(el_voice or "").strip()[:64],
             mood=mood,
             news_seconds=max(12, min(90, int(news_seconds))),
             custom_script=(custom_script or "").strip()[:12000],
@@ -301,6 +316,7 @@ async def create_job(
             niche=niche,
             topic=(topic or "").strip()[:300],
             voice=voice,
+            el_voice=(el_voice or "").strip()[:64],
             images=names,
         )
         return JSONResponse({"id": job.id})

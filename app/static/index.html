@@ -130,6 +130,11 @@
             </select>
           </label>
         </div>
+        <div id="elBox" class="hidden">
+          <label class="text-xs text-emerald-400">🎙️ Voice — <b>ElevenLabs ON</b> (human)
+            <select name="el_voice" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-emerald-700/40"></select>
+          </label>
+        </div>
         <div class="flex items-center justify-between gap-3">
           <button id="fetchBroll" type="button" class="hidden text-xs text-sky-400 hover:text-sky-300 underline">⬇ Fetch football B-roll (Pexels)</button>
           <button id="go" type="submit" class="ml-auto bg-gradient-to-r from-green-500 to-sky-500 hover:from-green-400 hover:to-sky-400 px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg">Generate ⚽</button>
@@ -163,6 +168,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 let MODE = "highlights";
 let YT = false;
+let EL_ON = false;
 const PLATFORMS = ["tiktok","instagram","youtube"];
 
 function setMode(m){
@@ -172,6 +178,7 @@ function setMode(m){
     el.classList.toggle("hidden", !el.dataset.for.split(" ").includes(m));
   });
   $("#fetchBroll").classList.toggle("hidden", !(m==="news"));
+  $("#elBox").classList.toggle("hidden", !(EL_ON && (m==="news" || m==="countdown")));
 }
 $$(".modebtn").forEach(b => b.onclick = () => setMode(b.dataset.mode));
 $("#useScript").onchange = () => $("#customScript").classList.toggle("hidden", !$("#useScript").checked);
@@ -181,10 +188,16 @@ async function jget(u){ const r = await fetch(u); return r.ok ? r.json() : null;
 async function boot(){
   const h = await jget("/api/health");
   if(h){ $("#health").innerHTML = `API key ${h.anthropic_key_set?'✅':'❌'} · whisper:${h.whisper_model}`; }
-  const [bg, mu, vo, mo, px, yt] = await Promise.all([
+  const [bg, mu, vo, mo, px, yt, el] = await Promise.all([
     jget("/api/backgrounds"), jget("/api/music"), jget("/api/voices"), jget("/api/moods"),
-    jget("/api/pexels/status"), jget("/api/youtube/status")
+    jget("/api/pexels/status"), jget("/api/youtube/status"), jget("/api/elevenlabs")
   ]);
+  if(el?.configured){
+    EL_ON = true;
+    const s = $("[name=el_voice]");
+    s.innerHTML = `<option value="">Default voice</option>` +
+      Object.entries(el.voices||{}).map(([id,name])=>`<option value="${id}">${name}</option>`).join("");
+  }
   fill($("[name=background]"), (bg?.backgrounds)||[], "Auto");
   fill($("[name=music]"), (mu?.music)||[], "None");
   if(vo?.voices){ const s=$("[name=voice]"); Object.entries(vo.voices).forEach(([id,label])=>{const o=document.createElement("option");o.value=id;o.textContent=label;s.appendChild(o);}); }
@@ -217,6 +230,7 @@ $("#form").onsubmit = async (e) => {
   fd.append("music", f.music.value||"");
   fd.append("background", f.background.value||"");
   fd.append("caption_style", f.caption_style.value||"bold_yellow");
+  if(EL_ON) fd.append("el_voice", ($("[name=el_voice]").value)||"");
   if(MODE==="highlights"){
     if(f.url.value) fd.append("url", f.url.value);
     if(f.file.files[0]) fd.append("file", f.file.files[0]);

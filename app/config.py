@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     # Pexels (free stock video/photos) — copyright-safe football B-roll for news mode.
     pexels_api_key: str = ""
 
+    # ElevenLabs (optional, paid) — far more human voiceover. When the key is set it
+    # replaces edge-tts. Pick any voice from your ElevenLabs Voice Library (licensed
+    # professional voices). Default = "Adam" (deep narrator). NOTE: cloning a real
+    # person's voice without their consent violates ElevenLabs' ToS — use the library.
+    elevenlabs_api_key: str = ""
+    elevenlabs_voice_id: str = "pNInz6obpgDQGcFmaJgB"   # premade "Adam" (deep male)
+    elevenlabs_model: str = "eleven_multilingual_v2"
+
     @property
     def shared_bin(self) -> Path:
         return Path(self.shared_bin_dir)
