@@ -308,11 +308,12 @@ def render_clip(
 FPS = 30
 EDIT_W, EDIT_H = 1080, 1920
 
-# Cinematic teal-shadow / warm-highlight grade for that "edit" colour pop.
+# Clean, punchy "edit" grade (Makaloozas-style): crisp contrast, deep blacks, a
+# slight cool tint, light sharpening, and a vignette to darken the edges.
 _GRADE = (
-    "eq=contrast=1.12:saturation=1.38:brightness=0.015:gamma=0.97,"
-    "colorbalance=rs=-0.05:bs=0.06:rm=0.02:bm=-0.02:rh=0.07:gh=0.02:bh=-0.06,"
-    "vignette=PI/5"
+    "eq=contrast=1.16:saturation=1.16:brightness=-0.012:gamma=0.95,"
+    "colorbalance=rs=-0.02:bs=0.04:bm=0.02,"
+    "unsharp=5:5:0.5,vignette=PI/4.5"
 )
 
 

@@ -31,8 +31,16 @@ STYLES: dict[str, dict] = {
         "outline_col": "&H00000000", "back": "&H64000000", "bold": -1,
         "borderstyle": 1, "outline": 6, "shadow": 3, "alignment": 5, "marginv": 0,
     },
+    "glow": {  # bold white, centered, soft glow halo (Makaloozas edit style)
+        "fontname": "Arial", "fontsize": 96, "primary": "&H00FFFFFF",
+        "outline_col": "&H00101010", "back": "&H50000000", "bold": -1,
+        "borderstyle": 1, "outline": 4, "shadow": 0, "alignment": 5, "marginv": 0,
+    },
 }
 DEFAULT_STYLE = "classic"
+
+# Styles that render their captions with a soft blurred glow (an inline \blur tag).
+GLOW_STYLES = {"glow"}
 
 # Top-pinned headline (the script title) used in voiceover mode for retention.
 # alignment 8 = top-center; marginv here is distance from the TOP.
@@ -150,11 +158,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             f"Dialogue: 0,{_fmt_time(0.0)},{_fmt_time(span_end)},Head,,60,60,0,,"
             f"{_escape(headline).upper()}"
         )
+    glow = r"{\blur5}" if style in GLOW_STYLES else ""
     for start, end, text in chunks:
         if end <= 0 or start >= (clip_end - clip_start):
             continue
         start = max(0.0, start)
-        text = _escape(text).upper()
+        text = glow + _escape(text).upper()
         lines.append(
             f"Dialogue: 0,{_fmt_time(start)},{_fmt_time(end)},Pop,,0,0,0,,{text}"
         )
