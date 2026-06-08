@@ -26,23 +26,41 @@ except Exception:  # pragma: no cover
     _SSL_CTX = None
 
 
+# Curated premade voices that work on the FREE tier (verified) — always offered so
+# the picker works even when the key lacks 'voices read' permission. Library voices
+# the user adds (if the key can read them) are merged on top.
+PREMADE: dict[str, str] = {
+    "onwK4e9ZLuTAKqWW03F9": "Daniel — deep British, epic narrator ⭐",
+    "JBFqnCBsd6RMkjVDRZzb": "George — raspy British, cinematic",
+    "pNInz6obpgDQGcFmaJgB": "Adam — deep American narrator",
+    "nPczCjzI2devNBz1zQrb": "Brian — deep American, calm",
+    "VR6AewLTigWG4xSOukaG": "Arnold — crisp, energetic (hype)",
+    "ErXwobaYiN019PkySvjV": "Antoni — warm American",
+}
+
+
 def is_configured() -> bool:
     return bool(settings.elevenlabs_api_key.strip())
 
 
 def list_voices() -> dict[str, str]:
-    """Return {voice_id: name} for the account's available voices (best-effort)."""
+    """Return {voice_id: name}: the user's library voices (if the key can read them)
+    plus the curated free-tier premades. Always returns the premades when configured."""
     if not is_configured():
         return {}
+    voices: dict[str, str] = {}
     req = urllib.request.Request(
         f"{API}/voices", headers={"xi-api-key": settings.elevenlabs_api_key.strip()}
     )
     try:
         with urllib.request.urlopen(req, timeout=30, context=_SSL_CTX) as r:
             data = json.loads(r.read().decode("utf-8"))
+        voices = {v["voice_id"]: v.get("name", "") for v in data.get("voices", []) if v.get("voice_id")}
     except Exception:
-        return {}
-    return {v["voice_id"]: v.get("name", "") for v in data.get("voices", []) if v.get("voice_id")}
+        voices = {}   # key lacks 'voices read' permission — fall back to premades only
+    for vid, name in PREMADE.items():
+        voices.setdefault(vid, name)
+    return voices
 
 
 def synthesize(
