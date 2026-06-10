@@ -102,7 +102,13 @@ def download_clip(
 
     outtmpl = str(out_dir / f"{name}.%(ext)s")
     opts = {
-        "format": "best[height<=720][ext=mp4]/best[height<=720]/best[ext=mp4]/best",
+        # Prefer a 1080p VIDEO-only stream (these clips are only used as visuals —
+        # the voiceover/music drive the audio — so no merge needed, and higher res
+        # means far less upscaling blur when cropped to 9:16).
+        "format": (
+            "bestvideo[height<=1080][ext=mp4]/bestvideo[height<=1080]/"
+            "best[height<=1080][ext=mp4]/best[height<=1080]/best"
+        ),
         "merge_output_format": "mp4",
         "outtmpl": outtmpl,
         "noplaylist": True, "quiet": True, "no_warnings": True, "restrictfilenames": True,

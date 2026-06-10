@@ -177,7 +177,7 @@ def render_voiceover(
 
     graph = (
         f"[0:v]scale={SPLIT_W}:{SPLIT_H}:force_original_aspect_ratio=increase,"
-        f"crop={SPLIT_W}:{SPLIT_H},setsar=1"
+        f"crop={SPLIT_W}:{SPLIT_H},setsar=1,unsharp=5:5:0.8"
     )
     if ass_name:
         graph += f",ass={ass_name}"

@@ -42,6 +42,10 @@ DEFAULT_STYLE = "classic"
 # Styles that render their captions with a soft blurred glow (an inline \blur tag).
 GLOW_STYLES = {"glow"}
 
+# Per-caption pop-in animation (ASS override): fade in + a quick scale bounce
+# (72% -> 106% -> 100%) so words appear smoothly instead of hard-cutting in.
+POP_IN = r"\fscx72\fscy72\fad(60,40)\t(0,140,\fscx106\fscy106)\t(140,230,\fscx100\fscy100)"
+
 # Top-pinned headline (the script title) used in voiceover mode for retention.
 # alignment 8 = top-center; marginv here is distance from the TOP.
 HEADLINE = {
@@ -158,12 +162,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             f"Dialogue: 0,{_fmt_time(0.0)},{_fmt_time(span_end)},Head,,60,60,0,,"
             f"{_escape(headline).upper()}"
         )
-    glow = r"{\blur5}" if style in GLOW_STYLES else ""
+    glow_inner = r"\blur5" if style in GLOW_STYLES else ""
+    anim = "{" + glow_inner + POP_IN + "}"
     for start, end, text in chunks:
         if end <= 0 or start >= (clip_end - clip_start):
             continue
         start = max(0.0, start)
-        text = glow + _escape(text).upper()
+        text = anim + _escape(text).upper()
         lines.append(
             f"Dialogue: 0,{_fmt_time(start)},{_fmt_time(end)},Pop,,0,0,0,,{text}"
         )
@@ -300,7 +305,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             continue
         lines.append(
             f"Dialogue: 0,{_fmt_time(start)},{_fmt_time(end)},Pop,,0,0,0,,"
-            + r"{\blur5}" + _escape(text).upper()
+            + "{" + r"\blur5" + POP_IN + "}" + _escape(text).upper()
         )
     # Per-segment overlays.
     for seg in segments:
