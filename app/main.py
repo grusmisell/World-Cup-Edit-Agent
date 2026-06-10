@@ -216,6 +216,7 @@ async def create_job(
     el_voice: str = Form(default=""),
     mood: str = Form(default=""),
     news_seconds: int = Form(default=30),
+    footage: str = Form(default="stock"),
     custom_script: str = Form(default=""),
     title: str = Form(default=""),
     file: UploadFile | None = File(default=None),
@@ -270,6 +271,7 @@ async def create_job(
             mood=mood,
             news_seconds=max(12, min(90, int(news_seconds))),
             custom_script=(custom_script or "").strip()[:12000],
+            footage="real" if (footage or "").strip().lower() == "real" else "stock",
         )
         return JSONResponse({"id": job.id})
 

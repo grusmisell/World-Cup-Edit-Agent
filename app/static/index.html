@@ -93,6 +93,12 @@
               <select name="voice" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10"><option value="">Auto</option></select>
             </label>
           </div>
+          <label class="text-xs text-slate-400 block">Footage
+            <select name="footage_news" class="mt-1 w-full bg-slate-900/70 rounded-lg px-2 py-2 text-sm border border-white/10">
+              <option value="real">⚽ Real match footage (auto-pull from YouTube)</option>
+              <option value="stock">Stock B-roll (Pexels)</option>
+            </select>
+          </label>
         </div>
 
         <!-- countdown -->
@@ -258,6 +264,7 @@ $("#form").onsubmit = async (e) => {
     fd.append("news_seconds", f.news_seconds.value||"28");
     fd.append("mood", f.mood.value||"");
     fd.append("voice", f.voice.value||"");
+    fd.append("footage", f.footage_news.value||"real");
     if($("#useScript").checked && f.custom_script.value.trim()){
       fd.append("custom_script", f.custom_script.value);
     }

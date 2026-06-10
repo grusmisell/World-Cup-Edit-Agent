@@ -96,6 +96,8 @@ class Job:
     music: str = settings.default_music
     no_music: bool = False    # render clean (to add a trending sound in-app)
     bpm: int = 0              # beat-sync the edit's pulse to this tempo (0 = off)
+    footage: str = "stock"    # news mode: "stock" Pexels B-roll | "real" auto-pulled match clips
+    footage_query: str = ""   # optional override for the real-footage YouTube search
     niche: str = settings.default_niche
     topic: str = ""           # news mode: subject(s), one per line
     voice: str = ""
@@ -192,6 +194,8 @@ def create_job(
     music: str = settings.default_music,
     no_music: bool = False,
     bpm: int = 0,
+    footage: str = "stock",
+    footage_query: str = "",
     niche: str = settings.default_niche,
     trend_match: bool = False,
     gen_captions: bool = settings.default_gen_captions,
@@ -221,6 +225,8 @@ def create_job(
         music=music,
         no_music=no_music,
         bpm=bpm,
+        footage=footage,
+        footage_query=footage_query,
         niche=niche,
         trend_match=trend_match,
         gen_captions=gen_captions,
@@ -377,6 +383,17 @@ def _run_news(job: Job, work_dir: Path, clips_dir: Path) -> None:
             script.text, work_dir / f"voice_{i + 1:02d}.mp3", voice, job.el_voice
         )
 
+        # Real match footage (auto-pulled) instead of stock B-roll, if requested.
+        if job.footage == "real":
+            job.set_stage("downloading", f"Story {i + 1}/{total}: finding real footage...")
+            adur = ffmpeg_utils.probe_duration(audio_path)
+            q = job.footage_query.strip() or f"{script.name_tag or script.subject} football highlights"
+            real = downloader.download_clip(
+                q, work_dir / "src", f"bg_{i + 1:02d}", length=max(18.0, adur + 3.0)
+            )
+            if real:
+                background = real
+
         job.set_stage("transcribing", f"Story {i + 1}/{total}: timing captions...")
         transcript = transcriber.transcribe(
             audio_path, work_dir, model_size=settings.whisper_model
@@ -407,6 +424,9 @@ def _run_news(job: Job, work_dir: Path, clips_dir: Path) -> None:
         )
         job.save()
 
+    if job.footage == "real":
+        import shutil as _sh3
+        _sh3.rmtree(work_dir / "src", ignore_errors=True)
     if not job.clips:
         raise RuntimeError("No news clips were produced.")
     job.title = job.clips[0].title if total == 1 else f"{total} World Cup news edits"
