@@ -44,17 +44,25 @@ _GOOD_KW = ("goals", "skills", "highlights", "best", "magic", "dribbl", "assist"
 _BAD_KW = ("reaction", "react", "interview", "press", "podcast", "talk", "news ", "fifa 2", "efootball", "pes 2", "gameplay")
 
 
-def _pick_video(query: str) -> dict | None:
+def _pick_video(query: str, must_contain: str = "") -> dict | None:
     """Flat-search YouTube and score results to pick a real highlight clip — prefer
-    goals/skills/highlights titles and a sane duration, avoid reactions/gameplay/Shorts."""
+    goals/skills/highlights titles and a sane duration, avoid reactions/gameplay/Shorts.
+
+    If `must_contain` is set (e.g. a player surname or country), ONLY consider videos
+    whose TITLE contains it — so a 'Messi' edit can't grab a generic goals comp that
+    happens to score well. Returns None if nothing matches (caller should NOT then
+    grab random footage)."""
     import yt_dlp
 
     try:
         with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": True}) as y:
-            info = y.extract_info(f"ytsearch6:{query}", download=False)
+            info = y.extract_info(f"ytsearch10:{query}", download=False)
     except Exception:
         return None
     entries = [e for e in (info.get("entries") or []) if e and e.get("id")]
+    if must_contain:
+        mc = must_contain.lower().strip()
+        entries = [e for e in entries if mc in (e.get("title") or "").lower()]
     if not entries:
         return None
 
@@ -77,7 +85,7 @@ def _pick_video(query: str) -> dict | None:
 
 
 def download_clip(
-    query: str, out_dir: Path, name: str, *, length: float = 12.0,
+    query: str, out_dir: Path, name: str, *, length: float = 12.0, must_contain: str = "",
 ) -> Path | None:
     """Search YouTube for `query`, pick a good highlight video, and download just a
     ~`length`s section (past the intro) as out_dir/<name>.mp4. Uses yt-dlp's partial
@@ -91,12 +99,19 @@ def download_clip(
     # ffmpeg_location, so make sure our bundled ffmpeg is discoverable there.
     os.environ["PATH"] = ffmpeg_utils.ffmpeg_dir() + os.pathsep + os.environ.get("PATH", "")
 
-    pick = _pick_video(query)
+    pick = _pick_video(query, must_contain=must_contain)
     if pick:
         dur = pick.get("duration") or 0
         # Start a bit in to skip intros/title cards; stay clear of the very end.
         start = min(max(12.0, dur * 0.12), max(12.0, dur - length - 2)) if dur else 15.0
         target = f"https://www.youtube.com/watch?v={pick['id']}"
+        try:
+            print(f"[footage] {name} <- {(pick.get('title') or '')[:70]}".encode('ascii', 'ignore').decode())
+        except Exception:
+            pass
+    elif must_contain:
+        # Required term not found in any result — refuse rather than grab wrong footage.
+        return None
     else:
         start, target = 15.0, f"ytsearch1:{query}"
 

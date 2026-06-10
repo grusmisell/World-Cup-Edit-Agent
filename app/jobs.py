@@ -98,6 +98,7 @@ class Job:
     bpm: int = 0              # beat-sync the edit's pulse to this tempo (0 = off)
     footage: str = "stock"    # news mode: "stock" Pexels B-roll | "real" auto-pulled match clips
     footage_query: str = ""   # optional override for the real-footage YouTube search
+    footage_must: str = ""    # require this word in the video title ("none"=no filter, ""=derive)
     niche: str = settings.default_niche
     topic: str = ""           # news mode: subject(s), one per line
     voice: str = ""
@@ -196,6 +197,7 @@ def create_job(
     bpm: int = 0,
     footage: str = "stock",
     footage_query: str = "",
+    footage_must: str = "",
     niche: str = settings.default_niche,
     trend_match: bool = False,
     gen_captions: bool = settings.default_gen_captions,
@@ -227,6 +229,7 @@ def create_job(
         bpm=bpm,
         footage=footage,
         footage_query=footage_query,
+        footage_must=footage_must,
         niche=niche,
         trend_match=trend_match,
         gen_captions=gen_captions,
@@ -303,6 +306,24 @@ def _resolve_music(job: Job) -> Path | None:
 
 
 # --- NEWS mode -------------------------------------------------------------
+
+# Words in a name-tag that are too generic to require in a footage title.
+_GENERIC_TAG_WORDS = {
+    "world", "cup", "worldcup", "top", "fifa", "football", "soccer", "best", "the",
+    "2026", "2022", "favorites", "favourite", "favourites", "ranking", "rankings",
+    "predictions", "teams", "team", "national", "goals", "skills", "highlights", "edit",
+}
+
+
+def _derive_must(name_tag: str) -> str:
+    """The most distinctive word from a name-tag (a player surname / country) to
+    require in the footage video title; '' if the tag is all generic words."""
+    import re as _re
+    for w in _re.findall(r"[a-z]+", (name_tag or "").lower()):
+        if len(w) >= 4 and w not in _GENERIC_TAG_WORDS:
+            return w
+    return ""
+
 
 def _news_subjects(job: Job, niche: str, n: int) -> list[str]:
     """Explicit subject lines first, then web-search-filled trending subjects."""
@@ -384,15 +405,25 @@ def _run_news(job: Job, work_dir: Path, clips_dir: Path) -> None:
         )
 
         # Real match footage (auto-pulled) instead of stock B-roll, if requested.
+        # We REQUIRE the subject's name in the video title so a 'Messi' edit can't
+        # pull a generic comp showing other teams.
         if job.footage == "real":
             job.set_stage("downloading", f"Story {i + 1}/{total}: finding real footage...")
             adur = ffmpeg_utils.probe_duration(audio_path)
-            q = job.footage_query.strip() or f"{script.name_tag or script.subject} football highlights"
+            tag = script.name_tag or script.subject
+            q = job.footage_query.strip() or f"{tag} football highlights"
+            must = job.footage_must.strip().lower()
+            if must == "none":
+                must = ""
+            elif not must:
+                must = _derive_must(tag)
             real = downloader.download_clip(
-                q, work_dir / "src", f"bg_{i + 1:02d}", length=max(18.0, adur + 3.0)
+                q, work_dir / "src", f"bg_{i + 1:02d}",
+                length=max(18.0, adur + 3.0), must_contain=must,
             )
             if real:
                 background = real
+            # else: keep the stock background (better than wrong footage).
 
         job.set_stage("transcribing", f"Story {i + 1}/{total}: timing captions...")
         transcript = transcriber.transcribe(
